@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Adobe Illustrator 29.2.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Calque_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="192px" height="192px" viewBox="0 0 192 192" style="enable-background:new 0 0 192 192;" xml:space="preserve">
+<style type="text/css">
+	.st0{display:none;fill:none;}
+	.st1{display:none;}
+	.st2{display:inline;fill:none;stroke:#1D1D1B;stroke-miterlimit:10;}
+	.st3{fill:#F39200;}
+</style>
+<rect id="background" x="-4" y="-4" class="st0" width="200" height="200"/>
+<g id="Calque_3" class="st1">
+	<circle class="st2" cx="96" cy="96" r="100"/>
+</g>
+<g id="Favicon">
+	<g>
+		<path class="st3" d="M34.26,128.94c-3.99-9.95-5.99-20.93-5.99-32.94c0-12.01,2-22.98,5.99-32.94c3.99-9.95,10-18.93,18.03-26.95
+			l9.47,7.91c-6.81,6.98-11.91,14.79-15.29,23.43C43.09,76.1,41.4,85.61,41.4,96c0,10.39,1.69,19.9,5.07,28.54
+			c3.38,8.64,8.48,16.47,15.29,23.49l-9.47,7.85C44.26,147.87,38.25,138.89,34.26,128.94z"/>
+		<path class="st3" d="M130.24,148.04c6.81-7.02,11.91-14.85,15.29-23.49c3.38-8.64,5.07-18.16,5.07-28.54
+			c0-10.39-1.69-19.9-5.07-28.54c-3.38-8.64-8.48-16.45-15.29-23.43l9.47-7.91c8.03,8.02,14.04,17,18.03,26.95
+			c3.99,9.95,5.99,20.93,5.99,32.94c0,12.01-2,22.99-5.99,32.94c-3.99,9.95-10,18.93-18.03,26.95L130.24,148.04z"/>
+	</g>
+</g>
+</svg>

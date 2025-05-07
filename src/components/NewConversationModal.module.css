@@ -1,0 +1,99 @@
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Modal content */
+.modalContent {
+  background-color: var(--bg-color-light); /* Light mode background */
+  padding: 2rem;
+  width: 400px;
+  border-radius: 8px;
+  text-align: center;
+  box-sizing: border-box; /* Ensure proper padding */
+  display: flex;
+  flex-direction: column; /* Ensures all content is vertically aligned */
+  align-items: center; /* Centers the input field horizontally */
+}
+
+/* Dark mode styling for the modal */
+.darkMode .modalContent {
+  background-color: var(--bg-color-dark); /* Dark mode background */
+  color: var(--text-color-dark); /* Dark mode text */
+}
+
+/* Header styling */
+.modalContent h3 {
+  margin-top: 0;
+  color: var(--text-color-light); /* Light mode text */
+}
+
+/* Dark mode header */
+.darkMode .modalContent h3 {
+  color: var(--text-color-dark); /* Dark mode text */
+}
+
+/* Input field */
+.modalContent input {
+  width: 100%;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  border: 1px solid var(--border-color-light); /* Light mode border */
+  border-radius: 4px;
+  background-color: var(--bg-color-light); /* Light mode input background */
+  color: var(--text-color-light); /* Light mode text */
+  box-sizing: border-box; /* Ensure proper width calculation */
+}
+
+/* Dark mode input field */
+.darkMode .modalContent input {
+  background-color: var(--bg-color-dark); /* Dark mode input background */
+  color: var(--text-color-dark); /* Dark mode input text */
+  border: 1px solid var(--border-color-dark); /* Dark mode border */
+}
+
+/* Action buttons */
+.modalActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%; /* Ensures buttons take full width */
+}
+
+.modalActions button {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Button colors */
+.modalActions button.add {
+  background-color: #FFA500;
+  color: #fff;
+}
+
+.modalActions button.cancel {
+  background-color: var(--border-color-light);
+  color: var(--text-color-light);
+}
+
+/* Dark mode buttons */
+.darkMode .modalActions button.add {
+  background-color: #FFA500;
+}
+
+.darkMode .modalActions button.cancel {
+  background-color: var(--border-color-dark); /* Dark mode button background */
+  color: var(--text-color-dark); /* Dark mode text */
+}
+

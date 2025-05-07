@@ -1,0 +1,53 @@
+.chatPage {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 300px;
+  border-right: 1px solid var(--border-color-light);
+  overflow-y: auto;
+}
+
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Full width for mobile view */
+@media (max-width: 768px) {
+  .chatPage {
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .sidebar, .mainContent {
+    width: 100%;
+    height: 100%;
+  }
+
+  .sidebar {
+    display: block;
+  }
+
+  .mainContent {
+    display: block;
+  }
+}
+
+/* Center text for "Select a conversation" */
+.noConversationSelected {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-color-light);
+}
+
+.darkMode .noConversationSelected {
+  color: var(--text-color-dark);
+}
+

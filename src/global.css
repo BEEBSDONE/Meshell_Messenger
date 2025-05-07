@@ -1,0 +1,35 @@
+
+:root {
+  --bg-color-light: #ffffff;
+  --text-color-light: #000000;
+  --border-color-light: #e6e6e6;
+  --primary-color-light: #FFA500;
+  --hover-color-light: #f0f0f0; /* Light mode hover color */
+
+  --bg-color-dark: #1a1a1a;
+  --text-color-dark: #f0f0f0;
+  --border-color-dark: #333333;
+  --hover-color-dark: #2a2a2a; /* Adjusted hover color for dark mode */
+  
+  --font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* Dark mode styles */
+.darkMode {
+  --bg-color-light: var(--bg-color-dark);
+  --text-color-light: var(--text-color-dark);
+  --border-color-light: var(--border-color-dark);
+  --hover-color-light: var(--hover-color-dark);
+}
+
+body {
+  background-color: var(--bg-color-light);
+  color: var(--text-color-light);
+  font-family: var(--font-family);
+}
+
+.darkMode body {
+  background-color: var(--bg-color-dark);
+  color: var(--text-color-dark);
+}
+

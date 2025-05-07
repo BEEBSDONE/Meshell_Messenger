@@ -1,0 +1,221 @@
+.conversationList {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Ensure it takes the full height */
+  background-color: var(--bg-color-light); /* Light Mode background */
+}
+
+.darkMode .conversationList {
+  background-color: var(--bg-color-dark); /* Dark Mode background */
+}
+
+/* Header section */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: var(--bg-color-light); /* Light Mode background */
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.darkMode .header {
+  background-color: var(--bg-color-dark); /* Dark Mode background */
+  border-bottom: 1px solid var(--border-color-dark);
+}
+
+/* Hamburger Menu */
+.hamburgerMenu {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.hamburgerLine {
+  width: 22px;
+  height: 3px;
+  background-color: var(--text-color-light); /* Light Mode */
+  margin: 3px 0;
+}
+
+.darkMode .hamburgerLine {
+  background-color: var(--text-color-dark); /* Dark Mode */
+}
+
+.hamburgerMenu:hover .hamburgerLine {
+  background-color: var(--hover-color-light); /* Light Mode hover */
+}
+
+.darkMode .hamburgerMenu:hover .hamburgerLine {
+  background-color: var(--hover-color-dark); /* Dark Mode hover */
+}
+
+/* Logo */
+.logo {
+  width: 100px; /* Adjust size as needed */
+  height: auto;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+/* New Conversation Button */
+.newConversationButton {
+  background-color: #FFA500; /* Lighter orange */
+  border: none;
+  color: white;
+  font-size: 24px;
+  width: 35px;
+  height: 35px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.newConversationButton:hover {
+  background-color: #E69500; /* Darker orange on hover */
+}
+
+/* Dropdown menu */
+.dropdown {
+  position: absolute;
+  top: 50px;
+  left: 10px;
+  background-color: var(--bg-color-light);
+  border: 1px solid var(--border-color-light);
+  border-radius: 5px;
+  width: 120px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.darkMode .dropdown {
+  background-color: var(--bg-color-dark);
+  border: 1px solid var(--border-color-dark);
+}
+
+.dropdownItem {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.dropdownItem:hover {
+  background-color: var(--hover-color-light); /* Light Mode hover */
+}
+
+.darkMode .dropdownItem:hover {
+  background-color: var(--hover-color-dark); /* Dark Mode hover */
+}
+
+/* Conversation List Styles */
+.conversationsContainer {
+  flex-grow: 1; /* Take up the remaining space */
+  overflow-y: auto; /* Enable scrolling */
+}
+
+.conversationItem {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color-light);
+  background-color: var(--bg-color-light); /* Light Mode default background */
+}
+
+.conversationItem:hover {
+  background-color: var(--hover-color-light); /* Light Mode hover */
+}
+
+.darkMode .conversationItem {
+  background-color: var(--bg-color-dark); /* Dark Mode background */
+  border-bottom: 1px solid var(--border-color-dark); /* Dark Mode border */
+}
+
+.darkMode .conversationItem:hover {
+  background-color: var(--hover-color-dark); /* Dark Mode hover */
+}
+
+.conversationName {
+  margin-left: 10px;
+  font-size: 16px;
+}
+
+/* Dark Mode Colors */
+:root {
+  --bg-color-light: #ffffff;
+  --text-color-light: #000000;
+  --hover-color-light: #f0f0f0;
+  --border-color-light: #ccc;
+
+  --bg-color-dark: #1a1a1a;
+  --text-color-dark: #f0f0f0;
+  --hover-color-dark: #333333;
+  --border-color-dark: #333333;
+}
+
+/* Toggle Switch CSS */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.switch input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 20px;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-color-light);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.moonIcon, .sunIcon {
+  display: inline-block;
+  font-size: 12px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+input:checked + .slider .moonIcon {
+  color: var(--bg-color-dark);
+}
+
+input:not(:checked) + .slider .sunIcon {
+  color: var(--primary-color-light);
+}
+

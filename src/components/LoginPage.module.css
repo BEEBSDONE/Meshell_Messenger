@@ -1,0 +1,132 @@
+
+/* Login page container */
+.loginPage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0; /* Ensure no margins to remove white border */
+  padding: 0;
+  box-sizing: border-box; /* Ensure all padding and borders are included in the element’s total width and height */
+  background-color: var(--bg-color-light); /* Default light mode background */
+  color: var(--text-color-light); /* Default light mode text */
+}
+
+.darkMode .loginPage {
+  background-color: var(--bg-color-dark); /* Dark mode background */
+  color: var(--text-color-dark); /* Dark mode text */
+}
+
+/* Logo styling */
+.logo {
+  width: 100%; /* Full width as wide as the loginBox */
+  max-width: 400px; /* Same max width as loginBox */
+  margin-bottom: 20px;
+}
+
+/* Login box styling */
+.loginBox {
+  background-color: var(--bg-color-light); /* Default light mode background */
+  padding: 2rem;
+  border: 1px solid var(--border-color-light);
+  border-radius: 8px;
+  text-align: center;
+  max-width: 400px; /* Ensure box and logo have the same width */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.darkMode .loginBox {
+  background-color: var(--bg-color-dark); /* Dark mode background */
+  border: 1px solid var(--border-color-dark);
+}
+
+.loginBox h2 {
+  margin-bottom: 1.5rem; /* Adjusted for better vertical spacing */
+  color: var(--text-color-light); /* Light mode text */
+}
+
+.darkMode .loginBox h2 {
+  color: var(--text-color-dark); /* Dark mode text */
+}
+
+/* Input field */
+.input {
+  width: 100%;
+  padding: 0.75rem;
+  margin: 0 auto 1.5rem auto; /* Centered the input field with auto margins */
+  border: 1px solid var(--border-color-light); /* Light mode border */
+  border-radius: 4px;
+  background-color: var(--bg-color-light); /* Light mode input background */
+  color: var(--text-color-light); /* Light mode text */
+  box-sizing: border-box; /* Ensure padding is included in the total width */
+}
+
+.darkMode .input {
+  background-color: var(--bg-color-dark); /* Dark mode input background */
+  color: var(--text-color-dark); /* Dark mode text */
+  border: 1px solid var(--border-color-dark);
+}
+
+/* Login button */
+.loginButton {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #FFA500; /* Orange color */
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.loginButton:hover {
+  background-color: #E69500; /* Darker orange on hover */
+}
+
+.darkMode .loginButton {
+  background-color: #FFA500; /* Same orange color for dark mode */
+}
+
+/* Ensure no margin or padding on the entire page */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Optional: you can add this for the LoginPage */
+.loginPage {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-color-light); /* Light mode background */
+}
+
+.darkMode .loginPage {
+  background-color: var(--bg-color-dark); /* Dark mode background */
+}
+
+.registerButton {
+  background-color: #fff; /* Same color as the "Close" button */
+  color: #FFA500;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.registerButton:focus {
+  outline: none;
+}
+
+.registerButton:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
