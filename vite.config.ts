@@ -4,7 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 import path from 'path';
 
-export default defineConfig({
+// https://vitejs.dev/config/
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     VitePWA({
@@ -27,13 +28,13 @@ export default defineConfig({
       },
     }),
   ],
-  server: {
-    host: true, // This makes the server accessible over the network
-    port: 5173, // Optional: specify a port if needed
+  server: command === 'serve' ? {
+    host: true,
+    port: 5173,
     https: {
       key: fs.readFileSync(path.resolve(__dirname, 'localhost+2-key.pem')),
       cert: fs.readFileSync(path.resolve(__dirname, 'localhost+2.pem')),
     },
-  },
-});
+  } : undefined,
+}));
 
