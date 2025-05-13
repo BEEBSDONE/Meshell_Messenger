@@ -1,6 +1,10 @@
-# React + TypeScript + Vite
+# MESHELL MESSENGER
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+You can access the messenger on [MeShell Messenger](https://msg.meshell.io)
+
+This is a messenger based on Nostr protocol. For more information, please refer to [NOSTR Protocol Docs](https://github.com/nostr-protocol/nostr)
+
+If you want to contribute, this template provides a minimal setup to get React working in Vite with HMR and some ESLint rules for your developement environment.
 
 Currently, two official plugins are available:
 
