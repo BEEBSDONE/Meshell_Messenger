@@ -33,3 +33,14 @@ body {
   color: var(--text-color-dark);
 }
 
+
+.historyControls {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  color: var(--text-color-light);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.historyControls:not(:empty) { padding: 0.6rem; }
+.historyControls button { cursor: pointer; }

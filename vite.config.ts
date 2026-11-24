@@ -5,6 +5,8 @@ import fs from 'fs';
 import path from 'path';
 
 // https://vitejs.dev/config/
+const hasLocalCertificate = fs.existsSync('localhost+2-key.pem') && fs.existsSync('localhost+2.pem');
+
 export default defineConfig(({ command }) => ({
   plugins: [
     react(),
@@ -29,12 +31,12 @@ export default defineConfig(({ command }) => ({
     }),
   ],
   server: command === 'serve' ? {
-    host: true,
+    host: hasLocalCertificate ? true : 'localhost',
     port: 5173,
-    https: {
+    https: hasLocalCertificate ? {
       key: fs.readFileSync(path.resolve(__dirname, 'localhost+2-key.pem')),
       cert: fs.readFileSync(path.resolve(__dirname, 'localhost+2.pem')),
-    },
+    } : undefined,
   } : undefined,
 }));
 

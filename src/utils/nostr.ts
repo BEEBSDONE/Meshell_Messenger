@@ -23,7 +23,6 @@ export const pool = new SimplePool();
 // Function to decode nsec (private key) using NIP-19
 export const decodeNsec = (nsec: string): Uint8Array => {
   const { type, data } = nip19.decode(nsec);
-  console.log('Decoded nsec:', { type, data });
   if (type !== 'nsec') throw new Error('Invalid nsec');
 
   if (data instanceof Uint8Array) {
@@ -82,3 +81,18 @@ export const derivePrivateKeyFromMnemonic = (
   return hexToBytes(privateKeyHex);
 };
 
+// publish() returns one promise per relay. Resolve on the first acknowledgement.
+export async function publishConfirmed(relays: string[], event: NostrEvent): Promise<void> {
+  const acknowledgements = pool.publish(relays, event);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.any(acknowledgements),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('No relay confirmed publication')), 10_000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}

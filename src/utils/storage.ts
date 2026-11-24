@@ -19,25 +19,34 @@ export const removeNsec = async (): Promise<void> => {
   await clearNsec();
 };
 
-export const getRelays = (): string[] => {
-  const relays = localStorage.getItem('relays');
-  if (relays) {
-    try {
-      const parsedRelays = JSON.parse(relays);
-      if (Array.isArray(parsedRelays)) {
-        return parsedRelays;
-      } else {
-        console.error('Relays data is not an array:', parsedRelays);
-        return [];
-      }
-    } catch (error) {
-      console.error('Error parsing relays from localStorage:', error);
-      return [];
-    }
-  } else {
-    return [];
+const defaultRelays = [
+  'wss://relay.damus.io', 'wss://nostr-pub.wellorder.net',
+  'wss://relay.nostr.band', 'wss://relay.snort.social',
+];
+
+export function normalizeRelayUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value.trim());
+    const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if (url.protocol !== 'wss:' && !(local && url.protocol === 'ws:')) return null;
+    if (url.username || url.password || url.hash) return null;
+    return url.href.replace(/\/$/, '');
+  } catch {
+    return null;
   }
-};
+}
+
+export function getRelays(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem('relays') || 'null');
+    if (Array.isArray(saved)) {
+      const valid = saved.map(normalizeRelayUrl).filter((url): url is string => url !== null);
+      if (!saved.length || valid.length) return [...new Set(valid)];
+    }
+  } catch { /* Recover malformed settings with the original defaults. */ }
+  return [...defaultRelays];
+}
 
 export const removeRelays = (): void => {
   localStorage.removeItem('relays');
