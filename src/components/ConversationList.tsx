@@ -1,33 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styles from './ConversationList.module.css';
 import ProfilePicture from './ProfilePicture';
 import NewConversationModal from './NewConversationModal';
 import SettingsPage from './SettingsPage';
 import ProfileModal from './ProfileModal';
-import { setDarkMode as storeDarkMode, getDarkMode } from '../utils/storage';
+import { setDarkMode as storeDarkMode } from '../utils/storage';
 import MeshellLogo from '../assets/MeShell_Logo.svg';
 
-interface Conversation {
-  id: string;
-  pubkey: string;
-  name: string;
-  latestMessageTimestamp: number;
-}
+import type { Conversation } from './ChatPage';
+import type useHistory from '../hooks/useHistory';
+import HistoryControls from './HistoryControls';
 
 interface ConversationListProps {
   conversations: Conversation[];
-  setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
-  setCurrentConversation: React.Dispatch<React.SetStateAction<Conversation | null>>;
+  onSelect: (pubkey: string) => void;
   darkMode: boolean;
-  setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
+  setDarkMode: (value: boolean) => void;
+  history: ReturnType<typeof useHistory>;
+  relays: string[];
+  onRelaysChange: (relays: string[]) => void;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  conversations,
-  setConversations,
-  setCurrentConversation,
-  darkMode,
-  setDarkMode,
+  conversations, onSelect, darkMode, setDarkMode, history, relays, onRelaysChange,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
@@ -42,26 +37,21 @@ const ConversationList: React.FC<ConversationListProps> = ({
     storeDarkMode(newDarkModeValue);
   };
 
-  useEffect(() => {
-    const savedDarkMode = getDarkMode();
-    if (savedDarkMode !== null) {
-      setDarkMode(savedDarkMode);
-    }
-  }, [setDarkMode]);
-
   return (
     <div className={styles.conversationList}>
       <div className={styles.header}>
-        <div className={styles.hamburgerMenu} onClick={toggleDropdown}>
-          <span className={styles.hamburgerLine}></span>
-          <span className={styles.hamburgerLine}></span>
-          <span className={styles.hamburgerLine}></span>
+        <div className={styles.hamburgerMenu}>
+          <button type="button" aria-label="Menu" aria-expanded={isDropdownOpen} className={styles.menuButton} onClick={toggleDropdown}>
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+          </button>
           {isDropdownOpen && (
             <div className={styles.dropdown}>
-              <div className={styles.dropdownItem} onClick={() => setShowProfileModal(true)}>
+              <div className={styles.dropdownItem} onClick={() => { setShowProfileModal(true); setIsDropdownOpen(false); }}>
                 Profile
               </div>
-              <div className={styles.dropdownItem} onClick={() => setShowSettings(true)}>
+              <div className={styles.dropdownItem} onClick={() => { setShowSettings(true); setIsDropdownOpen(false); }}>
                 Settings
               </div>
               <div className={styles.dropdownItem}>
@@ -86,35 +76,25 @@ const ConversationList: React.FC<ConversationListProps> = ({
         </button>
       </div>
 
-      <div className={styles.conversationsContainer}>
-        {conversations.length === 0 ? (
-          <div className={styles.noConversations}>No conversations</div>
-        ) : (
-          conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className={styles.conversationItem}
-              onClick={() => setCurrentConversation(conversation)}
-            >
-              <ProfilePicture pubkey={conversation.pubkey} isDarkMode={darkMode} />
-              <div className={styles.conversationDetails}>
-                <div className={styles.conversationName}>{conversation.name}</div>
-              </div>
-            </div>
-          ))
-        )}
+      <div aria-label="Conversations" role="region" className={styles.conversationsContainer}>
+        {conversations.map(conversation => (
+          <button type="button" key={conversation.pubkey} className={styles.conversationItem}
+            title={conversation.name} onClick={() => onSelect(conversation.pubkey)}>
+            <ProfilePicture picture={conversation.picture} isDarkMode={darkMode} />
+            <span className={styles.conversationName}>{conversation.name}</span>
+          </button>
+        ))}
+        <HistoryControls history={history} items="conversations" empty={!conversations.length} />
       </div>
 
       {showNewConversationModal && (
         <NewConversationModal
           setShowNewConversationModal={setShowNewConversationModal}
-          setConversations={setConversations}
-          conversations={conversations}
-          setCurrentConversation={setCurrentConversation}
+          onSelect={onSelect}
         />
       )}
 
-      {showSettings && <SettingsPage setShowSettings={setShowSettings} />}
+      {showSettings && <SettingsPage setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange} />}
       {showProfileModal && <ProfileModal setShowProfileModal={setShowProfileModal} darkMode={darkMode} />}
     </div>
   );

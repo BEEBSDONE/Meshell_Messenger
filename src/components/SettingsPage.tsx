@@ -1,25 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import DOMPurify from 'dompurify'; // Import DOMPurify
-import { getRelays, setRelays, removeNsec, removeRelays, removePrivateKey, removeDarkMode } from '../utils/storage';
+import React, { useState } from 'react';
+import { normalizeRelayUrl, removeNsec, removeRelays, removePrivateKey, removeDarkMode } from '../utils/storage';
 import styles from './SettingsPage.module.css';
 
 interface SettingsPageProps {
+  relayList: string[];
+  onChange: (relays: string[]) => void;
   setShowSettings: (show: boolean) => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ setShowSettings }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ setShowSettings, relayList, onChange }) => {
   const [relayInput, setRelayInput] = useState('');
-  const [relayList, setRelayList] = useState<string[]>([]);
-
-  useEffect(() => {
-    const relays = getRelays();
-    setRelayList(relays);
-  }, []);
-
   const addRelay = () => {
-    const relay = DOMPurify.sanitize(relayInput.trim()); // Sanitize the relay input
+    const relay = normalizeRelayUrl(relayInput);
     if (!relay) {
-      alert('Please enter a relay URL.');
+      alert('Enter a wss:// relay URL (or ws://localhost for a local relay).');
       return;
     }
     if (relayList.includes(relay)) {
@@ -27,15 +21,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ setShowSettings }) => {
       return;
     }
     const updatedRelays = [...relayList, relay];
-    setRelayList(updatedRelays);
-    setRelays(updatedRelays);
+    onChange(updatedRelays);
     setRelayInput('');
   };
 
   const removeRelay = (relay: string) => {
     const updatedRelays = relayList.filter((r) => r !== relay);
-    setRelayList(updatedRelays);
-    setRelays(updatedRelays);
+    onChange(updatedRelays);
   };
 
   const logout = async () => {

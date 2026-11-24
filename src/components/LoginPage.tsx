@@ -33,8 +33,7 @@ const LoginPage: React.FC = () => {
       decodeNsec(sanitizedNsec); // Verify nsec is valid
       await storeNsec(sanitizedNsec); // Wait for nsec to be stored in IndexedDB
       navigate('/chat', { replace: true });
-    } catch (error) {
-      console.error('Error decoding nsec:', error);
+    } catch {
       alert('Invalid nsec. Please enter a valid nsec.');
     } finally {
       setIsLoading(false);
@@ -64,7 +63,9 @@ const LoginPage: React.FC = () => {
       <div className={styles.loginBox}>
         <h2>Login</h2>
         <input
-          type="text"
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
           value={nsecInput}
           onChange={(e) => setNsecInput(e.target.value)}
           placeholder="Enter your nsec"

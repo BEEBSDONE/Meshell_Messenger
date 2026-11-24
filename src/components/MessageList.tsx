@@ -1,222 +1,129 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import DOMPurify from 'dompurify'; // Import DOMPurify
-import { getNsec, getRelays } from '../utils/storage';
-import { decodeNsec, createEvent, KIND_ENCRYPTED_DIRECT_MESSAGE } from '../utils/nostr';
-import { getPublicKey } from 'nostr-tools/pure';
-import { nip04, SimplePool } from 'nostr-tools';
-import styles from './MessageList.module.css';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { Event } from 'nostr-tools';
+import * as nip04 from 'nostr-tools/nip04';
+import useHistory from '../hooks/useHistory';
+import { conversationPeer } from '../utils/history';
+import { createEvent, KIND_ENCRYPTED_DIRECT_MESSAGE, publishConfirmed } from '../utils/nostr';
+import type { Conversation } from './ChatPage';
+import HistoryControls from './HistoryControls';
 import ProfilePicture from './ProfilePicture';
+import styles from './MessageList.module.css';
 
-interface Conversation {
-  id: string;
-  pubkey: string;
-  name: string;
-}
-
-interface MessageWithContent {
-  id: string;
-  pubkey: string;
-  created_at: number;
-  content: string;
-  decryptedContent: string;
-}
-
-interface MessageListProps {
+interface Props {
+  account: { sk: Uint8Array; pk: string };
   conversation: Conversation;
+  relays: string[];
   isDarkMode: boolean;
-  onBack?: () => void; // Callback for the back button on mobile view
+  onBack?: () => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ conversation, isDarkMode, onBack }) => {
-  const [messages, setMessages] = useState<MessageWithContent[]>([]);
+interface Message {
+  id: string;
+  sent: boolean;
+  time: number;
+  text: string | null;
+}
+
+export default function MessageList({ account, conversation, relays, isDarkMode, onBack }: Props) {
+  const { pk, sk } = account;
+  const peer = conversation.pubkey;
+  const [byId, setById] = useState<Record<string, Message>>({});
   const [inputValue, setInputValue] = useState('');
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
-  const [sk, setSk] = useState<Uint8Array | null>(null);
-  const [pk, setPk] = useState<string>('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isAutoScrollEnabled] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
+  const draft = useRef<{ text: string; event: Event } | null>(null);
+  const active = useRef(true);
+  const pending = useRef(false);
+  const scrollBox = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
 
-  const messageIdsRef = useRef<Set<string>>(new Set());
-  const pool = useMemo(() => new SimplePool(), []);
-  const relayUrls = useMemo(() => {
-    const relaysFromStorage = getRelays();
-    return Array.isArray(relaysFromStorage) ? relaysFromStorage : ['wss://relay.damus.io'];
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
   }, []);
-
-  useEffect(() => {
-    const initializeKeys = async () => {
-      const nsec = await getNsec();
-      if (nsec) {
-        try {
-          const privateKey = decodeNsec(nsec);
-          const publicKey = getPublicKey(privateKey);
-          setSk(privateKey);
-          setPk(publicKey);
-        } catch (error) {
-          console.error('Error decoding nsec:', error);
-        }
-      }
-    };
-    initializeKeys();
-  }, []);
-
-  const fetchMessages = useCallback(async () => {
-    if (!sk || !pk) return;
-
-    const filters = [
-      { kinds: [KIND_ENCRYPTED_DIRECT_MESSAGE], authors: [pk], '#p': [conversation.pubkey] },
-      { kinds: [KIND_ENCRYPTED_DIRECT_MESSAGE], authors: [conversation.pubkey], '#p': [pk] },
-    ];
-
-    const sub = pool.subscribeMany(relayUrls, filters, {
-      onevent: async (event: any) => {
-        if (messageIdsRef.current.has(event.id)) return;
-        messageIdsRef.current.add(event.id);
-        let decryptedContent = '';
-        try {
-          decryptedContent = await nip04.decrypt(sk, event.pubkey === pk ? conversation.pubkey : event.pubkey, event.content);
-        } catch {
-          return;
-        }
-        const eventWithDecryptedContent: MessageWithContent = { ...event, decryptedContent };
-        setMessages((prevMessages) => {
-          const updatedMessages = [...prevMessages, eventWithDecryptedContent];
-          updatedMessages.sort((a, b) => a.created_at - b.created_at);
-          return updatedMessages;
-        });
-      },
-    });
-
-    return sub;
-  }, [sk, pk, conversation.pubkey, pool, relayUrls]);
-
-  useEffect(() => {
-    let subscription: any = null;
-    
-    const loadMessages = async () => {
-      messageIdsRef.current.clear();
-      setMessages([]);
-      setHasMoreMessages(true);
-      subscription = await fetchMessages();
-    };
-
-    loadMessages();
-
-    // Cleanup function to close subscription when component unmounts or conversation changes
-    return () => {
-      if (subscription) {
-        subscription.close();
-      }
-    };
-  }, [conversation.pubkey, fetchMessages]);
-
-  useEffect(() => {
-    if (isAutoScrollEnabled) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isAutoScrollEnabled]);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (e.currentTarget.scrollTop === 0 && hasMoreMessages) {
-      fetchMessages().then((loadedMessages) => {
-        if (!loadedMessages) {
-          setHasMoreMessages(false);
-          return;
-        }
-      });
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!inputValue.trim() || !sk || !pk) return;
-
-    // Sanitize the input value
-    const sanitizedInput = DOMPurify.sanitize(inputValue.trim());
-
-    let encryptedContent = '';
+  const store = useCallback((event: Event, text: string | null) => {
+    if (!active.current) return;
+    const message = { id: event.id, sent: event.pubkey === pk, time: event.created_at, text };
+    setById(prev => prev[event.id] ? prev : { ...prev, [event.id]: message });
+  }, [pk]);
+  const receive = useCallback(async (event: Event) => {
+    if (conversationPeer(event, pk) !== peer) return;
     try {
-      encryptedContent = await nip04.encrypt(sk, conversation.pubkey, sanitizedInput);
+      store(event, await nip04.decrypt(sk, peer, event.content));
     } catch {
-      return;
+      store(event, null);
     }
+  }, [peer, pk, sk, store]);
+  const history = useHistory(relays, pk, peer, receive);
+  const messages = useMemo(() => Object.values(byId).sort((a, b) => a.time - b.time || a.id.localeCompare(b.id)), [byId]);
 
-    const eventTemplate = {
-      kind: KIND_ENCRYPTED_DIRECT_MESSAGE,
-      content: encryptedContent,
-      tags: [['p', conversation.pubkey]],
-    };
-    const event = createEvent(sk, eventTemplate);
-    await pool.publish(relayUrls, event);
-    const eventWithDecryptedContent: MessageWithContent = { ...event, decryptedContent: sanitizedInput };
-    setMessages((prevMessages) => {
-      const updatedMessages = [...prevMessages, eventWithDecryptedContent];
-      updatedMessages.sort((a, b) => a.created_at - b.created_at);
-      return updatedMessages;
-    });
-    messageIdsRef.current.add(event.id);
-    setInputValue('');
-  };
+  useLayoutEffect(() => {
+    const box = scrollBox.current;
+    if (box && followLatest.current) box.scrollTop = box.scrollHeight;
+  }, [messages]);
+
+  async function sendMessage() {
+    const text = inputValue.trim();
+    if (!text || pending.current) return;
+    pending.current = true;
+    setSending(true);
+    setSendError(false);
+    try {
+      if (!draft.current || draft.current.text !== text) {
+        const content = await nip04.encrypt(sk, peer, text);
+        if (!active.current) return;
+        draft.current = { text, event: createEvent(sk, {
+          kind: KIND_ENCRYPTED_DIRECT_MESSAGE, tags: [['p', peer]], content,
+        }) };
+      }
+      const { event } = draft.current;
+      await publishConfirmed(relays, event);
+      if (!active.current) return;
+      followLatest.current = true;
+      store(event, text);
+      draft.current = null;
+      setInputValue('');
+    } catch {
+      if (active.current) setSendError(true);
+    } finally {
+      pending.current = false;
+      if (active.current) setSending(false);
+    }
+  }
 
   return (
     <div className={`${styles.messageListContainer} ${isDarkMode ? styles.darkMode : ''}`}>
       <div className={styles.header}>
-        {onBack && (
-          <button className={styles.backButton} onClick={onBack}>
-            ←
-          </button>
-        )}
-        <ProfilePicture pubkey={conversation.pubkey} isDarkMode={isDarkMode} />
+        {onBack && <button className={styles.backButton} onClick={onBack} aria-label="Back to conversations">←</button>}
+        <ProfilePicture picture={conversation.picture} isDarkMode={isDarkMode} />
         <span className={styles.username}>{conversation.name}</span>
       </div>
-
-      <div className={styles.messageList} onScroll={handleScroll} ref={messagesEndRef}>
-        {messages.slice().reverse().map((message, index, array) => {
-          const messageDate = new Date(message.created_at * 1000);
-          const prevMessageDate = index > 0 ? new Date(array[index - 1].created_at * 1000) : null;
-          
-          const showDateSeparator = !prevMessageDate || 
-            messageDate.getDate() !== prevMessageDate.getDate() ||
-            messageDate.getMonth() !== prevMessageDate.getMonth() ||
-            messageDate.getFullYear() !== prevMessageDate.getFullYear();
-
+      <div role="region" aria-label="Messages" className={styles.messageList} ref={scrollBox} onScroll={e => {
+        const box = e.currentTarget;
+        followLatest.current = box.scrollHeight - box.scrollTop - box.clientHeight < 32;
+      }}>
+        <HistoryControls history={history} items="messages" empty={!messages.length} />
+        {messages.map((message, i) => {
+          const date = new Date(message.time * 1000);
+          const newDay = !i || date.toDateString() !== new Date(messages[i - 1].time * 1000).toDateString();
           return (
-            <React.Fragment key={message.id}>
-              {showDateSeparator && (
-                <div className={styles.dateSeparator}>
-                  {messageDate.toLocaleDateString(undefined, { 
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </div>
-              )}
-              <div className={message.pubkey === pk ? styles.sentMessage : styles.receivedMessage}>
-                <div className={styles.messageContent}>
-                  {message.decryptedContent || '[Encrypted Message]'}
-                </div>
-                <div className={styles.messageTime}>
-                  {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
+            <Fragment key={message.id}>
+              {newDay && <div className={styles.dateSeparator}>{date.toLocaleDateString(undefined, {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+              })}</div>}
+              <div className={message.sent ? styles.sentMessage : styles.receivedMessage}>
+                <div className={styles.messageContent}>{message.text ?? 'This message could not be decrypted.'}</div>
+                <div className={styles.messageTime}>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
-            </React.Fragment>
+            </Fragment>
           );
         })}
-        <div ref={messagesEndRef} />
       </div>
-      <div className={styles.inputContainer}>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Type your message..."
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') sendMessage();
-          }}
-        />
-        <button onClick={sendMessage}>Send</button>
-      </div>
+      {sendError && <div role="alert">No relay confirmed this message. Your draft is ready to retry.</div>}
+      <form className={styles.inputContainer} onSubmit={e => { e.preventDefault(); void sendMessage(); }}>
+        <input aria-label="Message" value={inputValue} disabled={sending} onChange={e => setInputValue(e.target.value)} placeholder="Type your message..." />
+        <button disabled={sending || !inputValue.trim()}>{sending ? 'Sending…' : 'Send'}</button>
+      </form>
     </div>
   );
-};
-
-export default MessageList;
-
+}

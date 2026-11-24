@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import DOMPurify from 'dompurify'; // Import DOMPurify
 import styles from './ProfileModal.module.css';
-import { decodeNsec, encodeNpub, createEvent } from '../utils/nostr';
+import { decodeNsec, encodeNpub, createEvent, pool, publishConfirmed } from '../utils/nostr';
 import { getNsec, getRelays } from '../utils/storage';
 import { getPublicKey } from 'nostr-tools/pure';
 import ProfilePicture from './ProfilePicture';
-import { SimplePool } from 'nostr-tools/pool';
+import type { EventTemplate } from 'nostr-tools/pure';
+import type { SubCloser } from 'nostr-tools/pool';
 import { BlossomUploader } from '@nostrify/nostrify/uploaders';
 
 interface ProfileModalProps {
   setShowProfileModal: (show: boolean) => void;
   darkMode: boolean;
-}
-
-interface Content {
-  name: string;
-  picture?: string;
 }
 
 const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMode }) => {
@@ -25,44 +21,35 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
   const [nickname, setNickname] = useState<string>('');
 
   useEffect(() => {
-    const initializeProfile = async () => {
-      const storedNsec = await getNsec();
-      if (storedNsec) {
-        setNsec(storedNsec);
-        try {
-          const sk = decodeNsec(storedNsec);
-          const pubkey = getPublicKey(sk);
-          const encodedNpub = encodeNpub(pubkey);
-          const pool = new SimplePool();
-          setNpub(encodedNpub);
-          let relays = getRelays();
-
-          const metadata = pool.subscribeMany(
-            [...relays],
-            [
-              {
-                authors: [pubkey],
-                kinds: [0],
-              },
-            ],
-            {
-              onevent(event) {
-                const contentObj: Content = JSON.parse(event.content);
-                setNickname(contentObj.name);
-                setProfilePicture(contentObj.picture || null);
-              },
-              oneose() {
-                metadata.close();
-              },
-            }
-          );
-        } catch (error) {
-          console.error('Error decoding nsec or fetching profile:', error);
-        }
-      }
+    let active = true;
+    let metadata: SubCloser | undefined;
+    getNsec().then(storedNsec => {
+      if (!active || !storedNsec) return;
+      const pubkey = getPublicKey(decodeNsec(storedNsec));
+      setNsec(storedNsec);
+      setNpub(encodeNpub(pubkey));
+      const relays = getRelays();
+      if (!relays.length) return;
+      let newest: { time: number; id: string } | undefined;
+      metadata = pool.subscribeManyEose(relays, [{ authors: [pubkey], kinds: [0] }], {
+        maxWait: 8_000,
+        onevent(event) {
+          if (!active || (newest && (newest.time > event.created_at ||
+            (newest.time === event.created_at && newest.id <= event.id)))) return;
+          try {
+            const content = JSON.parse(event.content);
+            if (!content || typeof content !== 'object' || Array.isArray(content)) return;
+            newest = { time: event.created_at, id: event.id };
+            setNickname(typeof content.name === 'string' ? content.name : '');
+            setProfilePicture(typeof content.picture === 'string' && /^https:\/\//i.test(content.picture) ? content.picture : null);
+          } catch { /* Keep the last readable profile. */ }
+        },
+      });
+    }).catch(() => { if (active) console.error('Could not open the profile.'); });
+    return () => {
+      active = false;
+      metadata?.close();
     };
-
-    initializeProfile();
   }, []);
 
   const handleProfilePictureChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,7 +66,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
         const pubkey = getPublicKey(sk);
 
         const signer = {
-          signEvent: async (event: any) => {
+          signEvent: async (event: EventTemplate) => {
             return createEvent(sk, event);
           },
           pubkey,
@@ -114,8 +101,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
     const storedNsec = await getNsec();
     if (storedNsec) {
       try {
-        const poolsend = new SimplePool();
-        let relays = getRelays();
+        const relays = getRelays();
         const sk = decodeNsec(storedNsec);
         const eventTemplate = {
           kind: 0,
@@ -128,7 +114,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
         };
         const event = createEvent(sk, eventTemplate);
         try {
-          await poolsend.publish(relays, event);
+          await publishConfirmed(relays, event);
           setShowProfileModal(false);
         } catch (error) {
           console.error('Error sending metadata update:', error);
@@ -148,10 +134,11 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
             <img
               src={profilePicture}
               alt="Profile"
+              referrerPolicy="no-referrer"
               className={styles.profilePicture}
             />
           ) : (
-            <ProfilePicture pubkey={nsec ? getPublicKey(decodeNsec(nsec)) : ''} isDarkMode={darkMode} />
+            <ProfilePicture isDarkMode={darkMode} />
           )}
           <label className={styles.uploadButton}>
             Upload Avatar
