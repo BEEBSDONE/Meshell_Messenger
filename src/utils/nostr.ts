@@ -1,6 +1,6 @@
 import { SimplePool } from 'nostr-tools/pool';
 import * as nip19 from 'nostr-tools/nip19';
-import type { Event as NostrEvent } from 'nostr-tools/pure';
+import type { Event as NostrEvent, EventTemplate, VerifiedEvent } from 'nostr-tools/pure';
 import {
   finalizeEvent,
   verifyEvent,
@@ -12,7 +12,6 @@ export const KIND_METADATA = 0; // User metadata
 export const KIND_TEXT_NOTE = 1; // Text note
 export const KIND_CONTACT_LIST = 3; // Contact list
 export const KIND_ENCRYPTED_DIRECT_MESSAGE = 4; // Encrypted direct message (NIP-04)
-export const KIND_EPHEMERAL_MESSAGE = 20000; // NIP-17 Ephemeral event kind
 
 // Initialize SimplePool
 export const pool = new SimplePool();
@@ -65,8 +64,9 @@ export const derivePrivateKeyFromMnemonic = (
 };
 
 // publish() returns one promise per relay. Resolve on the first acknowledgement.
-export async function publishConfirmed(relays: string[], event: NostrEvent): Promise<void> {
-  const acknowledgements = pool.publish(relays, event);
+export type AuthSigner = (event: EventTemplate) => Promise<VerifiedEvent>;
+export async function publishConfirmed(relays: string[], event: NostrEvent, onauth?: AuthSigner): Promise<void> {
+  const acknowledgements = pool.publish(relays, event, { onauth, maxWait: 10_000 });
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([

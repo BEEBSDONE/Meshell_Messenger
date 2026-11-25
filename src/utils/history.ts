@@ -1,6 +1,8 @@
 import type { Event, Filter } from 'nostr-tools';
-import type { AbstractRelay, Subscription } from 'nostr-tools/abstract-relay';
+import type { AbstractRelay, Subscription, SubscriptionParams } from 'nostr-tools/abstract-relay';
 import type { SimplePool } from 'nostr-tools/pool';
+
+import type { AuthSigner } from './nostr';
 
 const PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 1000;
@@ -31,7 +33,7 @@ interface Direction {
 interface Source {
   url: string;
   directions: Direction[];
-  live?: Subscription;
+  live?: Pick<Subscription, 'close'>;
   busy: boolean;
   failed: boolean;
 }
@@ -53,9 +55,30 @@ export function conversationPeer(event: Event, account: string): string | undefi
   if (recipient === account) return event.pubkey;
 }
 
+// An inbox relay may close its first subscription until NIP-42 authentication succeeds.
+export function subscribeRelay(relay: AbstractRelay, filters: Filter[], params: SubscriptionParams, sign?: AuthSigner) {
+  let current: Subscription | undefined;
+  let closed = false;
+  let retried = false;
+  function start() {
+    current = relay.subscribe(filters, { ...params, onclose(reason) {
+      current = undefined;
+      if (closed) return;
+      if (sign && !retried && reason.startsWith('auth-required:')) {
+        retried = true;
+        void relay.auth(sign).then(() => { if (!closed) start(); }).catch(() => {
+          if (!closed) params.onclose?.(reason);
+        });
+      } else params.onclose?.(reason);
+    } });
+  }
+  start();
+  return { close() { closed = true; current?.close(); } };
+}
+
 // nostr-tools also calls oneose on its own timer. Our earlier deadline
 // keeps a timeout or CLOSED response retryable instead of marking history complete.
-function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, receive: (event: Event) => boolean) {
+function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, receive: (event: Event) => boolean, sign?: AuthSigner) {
   return new Promise<{ oldest: number; count: number; added: boolean }>((resolve, reject) => {
     let oldest = Infinity;
     let added = false;
@@ -72,7 +95,7 @@ function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, rec
     };
     const abort = () => finish(new Error('History request cancelled'));
     if (signal.aborted) { reject(new Error('History request cancelled')); return; }
-    const subscription = relay.subscribe([filter], {
+    const subscription = subscribeRelay(relay, [filter], {
       eoseTimeout: TIMEOUT * 2,
       onevent(event) {
         if (finished || ids.has(event.id)) return;
@@ -82,7 +105,7 @@ function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, rec
       },
       oneose: () => finish(),
       onclose: () => finish(new Error('Relay closed history request'), true),
-    });
+    }, sign);
     const timer = setTimeout(() => finish(new Error('Relay history timed out')), TIMEOUT);
     signal.addEventListener('abort', abort, { once: true });
   });
@@ -90,7 +113,7 @@ function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, rec
 
 export function openHistory(
   pool: SimplePool, urls: string[], filters: Filter[],
-  onEvent: (event: Event) => void, onStatus: (status: HistoryStatus) => void,
+  onEvent: (event: Event) => void, onStatus: (status: HistoryStatus) => void, sign?: AuthSigner,
 ) {
   const controller = new AbortController();
   const { signal } = controller;
@@ -132,7 +155,7 @@ export function openHistory(
       // the same action so a repeated event does not look like the end of history.
       for (let attempt = 0; attempt < 2 && direction.cursor; attempt++) {
         const cursor: Cursor = direction.cursor;
-        const { oldest, count, added } = await readPage(relay, { ...filter, ...cursor }, signal, receive);
+        const { oldest, count, added } = await readPage(relay, { ...filter, ...cursor }, signal, receive, sign);
         if (count === 0) direction.cursor = null;
         else if (oldest !== cursor.until) direction.cursor = { until: oldest, limit: PAGE_SIZE };
         else if (count >= cursor.limit && cursor.limit < MAX_PAGE_SIZE) {
@@ -159,14 +182,14 @@ export function openHistory(
       if (signal.aborted) return;
       if (reconnect) {
         source.failed = false;
-        source.live = relay.subscribe(filters.map(f => ({ ...f, limit: 0 })), {
+        source.live = subscribeRelay(relay, filters.map(f => ({ ...f, limit: 0 })), {
           onevent: receive,
           onclose: () => {
             source.live = undefined;
             source.failed = true;
             report();
           },
-        });
+        }, sign);
         // Refetch the head to cover messages that arrived during disconnection.
         for (const d of source.directions) d.cursor = { limit: PAGE_SIZE };
       }

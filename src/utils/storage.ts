@@ -2,8 +2,14 @@ import { decodeNsec } from './nostr';  // Make sure to import the necessary util
 import { getPublicKey } from 'nostr-tools/pure';  // Ensure you're using nostr-tools
 import { storeEncryptedNsec, getEncryptedNsec, clearNsec } from './secureStorage';
 
+export const ACCOUNT_CHANGE = 'meshell:account-change';
+function notifyAccountChange() {
+  try { localStorage.setItem(ACCOUNT_CHANGE, crypto.randomUUID()); } catch { /* IndexedDB is authoritative. */ }
+}
+
 export const storeNsec = async (nsec: string): Promise<void> => {
   await storeEncryptedNsec(nsec);
+  notifyAccountChange();
 };
 
 export const getNsec = async (): Promise<string | null> => {
@@ -17,6 +23,7 @@ export const getPrivateKey = (): string | null => {
 
 export const removeNsec = async (): Promise<void> => {
   await clearNsec();
+  notifyAccountChange();
 };
 
 const defaultRelays = [

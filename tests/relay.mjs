@@ -1,5 +1,5 @@
 import { matchFilters } from 'nostr-tools/filter';
-import { generateSecretKey, getPublicKey, finalizeEvent } from 'nostr-tools/pure';
+import { generateSecretKey, getPublicKey, finalizeEvent, verifyEvent } from 'nostr-tools/pure';
 import { nip04, nip19 } from 'nostr-tools';
 
 export function identity() {
@@ -12,6 +12,10 @@ export async function dm(from, to, time, text) {
   return finalizeEvent({
     kind: 4, tags: [['p', to.pk]], created_at: time, content: await nip04.encrypt(from.sk, to.pk, text),
   }, from.sk);
+}
+
+export function inboxList(user, urls, time = 100) {
+  return finalizeEvent({ kind: 10050, created_at: time, tags: urls.map(url => ['relay', 'wss://' + url]), content: '' }, user.sk);
 }
 
 export function relay(events = []) {
@@ -35,15 +39,25 @@ export async function login(page, user, servers, initial = Object.keys(servers),
     if (!server) throw new Error('Unexpected relay ' + ws.url());
     server.sockets.add(ws);
     const subs = new Map();
+    let authenticated;
     const send = frame => ws.send(JSON.stringify(frame));
     ws.onMessage(raw => {
       const [command, arg, ...rest] = JSON.parse(String(raw));
+      if (command === 'AUTH') {
+        const valid = arg.kind === 22242 && verifyEvent(arg) && arg.tags.some(([t, v]) => t === 'challenge' && v === 'fixture-challenge') &&
+          arg.tags.some(([t, v]) => t === 'relay' && new URL(v).hostname === new URL(ws.url()).hostname);
+        if (valid) authenticated = arg.pubkey;
+        send(['OK', arg.id, valid, valid ? '' : 'invalid: auth']); return;
+      }
       if (command === 'CLOSE') {
         server.live.delete(subs.get(arg));
         subs.delete(arg);
         return;
       }
       if (command === 'EVENT') {
+        if (server.requireWriteAuth && !authenticated) {
+          send(['AUTH', 'fixture-challenge']); send(['OK', arg.id, false, 'auth-required: authenticate']); return;
+        }
         server.writes.push(arg);
         if (!server.rejectWrites) {
           server.events.push(arg);
@@ -56,6 +70,9 @@ export async function login(page, user, servers, initial = Object.keys(servers),
       }
       if (command !== 'REQ') return;
       server.requests.push(rest);
+      if ((server.requireAllAuth && !authenticated) || server.requireReadAuth && rest.some(f => f.kinds?.includes(1059) && !f['#p']?.includes(authenticated))) {
+        send(['AUTH', 'fixture-challenge']); send(['CLOSED', arg, 'auth-required: authenticate']); return;
+      }
       if (server.rejectReads || server.rejectWhen?.(rest)) return send(['CLOSED', arg, 'restricted: test']);
       const entry = { filters: rest, deliver: event => send(['EVENT', arg, event]) };
       subs.set(arg, entry);

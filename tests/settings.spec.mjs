@@ -96,7 +96,11 @@ test('remembers a Primal opt-out across logout and enables history for a differe
     await page.waitForURL('**/chat');
   };
   const opt = dialog => dialog.getByRole('checkbox', { name: 'Read history from Primal' });
-  const logout = async dialog => { await dialog.getByRole('button', { name: 'Logout' }).click(); await page.waitForURL('**/'); };
+  const logout = async dialog => {
+    await dialog.getByRole('button', { name: 'Logout' }).click();
+    await page.getByRole('dialog', { name: 'Log out of MeShell?' }).getByRole('button', { name: 'Logout' }).click();
+    await page.waitForURL('**/');
+  };
   await expect.poll(() => requests.includes(first.pk)).toBe(true);
   let dialog = await openSettings(page);
   await expect(opt(dialog)).toBeChecked();

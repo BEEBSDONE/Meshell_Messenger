@@ -7,13 +7,18 @@ import ProfileModal from './ProfileModal';
 import { setDarkMode as storeDarkMode } from '../utils/storage';
 import MeshellLogo from '../assets/MeShell_Logo.svg';
 
+import type { InboxRelays } from '../hooks/useInboxRelays';
 import type { Conversation } from './ChatPage';
 import type useHistory from '../hooks/useHistory';
+import type { RelayHistory } from '../hooks/useHistory';
 import type { RelayStates } from '../utils/history';
 import HistoryControls from './HistoryControls';
 
 interface ConversationListProps {
   conversations: Conversation[];
+  dmInbox: InboxRelays;
+  giftHistory: RelayHistory;
+  onCopyNsec: () => Promise<void>;
   onSelect: (pubkey: string) => void;
   darkMode: boolean;
   setDarkMode: (value: boolean) => void;
@@ -27,7 +32,7 @@ interface ConversationListProps {
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  conversations, onSelect, darkMode, setDarkMode, history, relays, relayStates, onRetryRelays, onRelaysChange, primalEnabled, onPrimalChange,
+  conversations, dmInbox, giftHistory, onSelect, onCopyNsec, darkMode, setDarkMode, history, relays, relayStates, onRetryRelays, onRelaysChange, primalEnabled, onPrimalChange,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
@@ -81,6 +86,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
         </button>
       </div>
 
+      {!dmInbox.looking && !dmInbox.urls.length && <button className={styles.inboxSetup} onClick={() => setShowSettings(true)}>Set up message inbox</button>}
       <div aria-label="Conversations" role="region" className={styles.conversationsContainer}>
         {conversations.map(conversation => (
           <button type="button" key={conversation.pubkey} className={styles.conversationItem}
@@ -99,7 +105,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
         />
       )}
 
-      {showSettings && <SettingsPage setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
+      {showSettings && <SettingsPage dmInbox={dmInbox} giftHistory={giftHistory} onCopyNsec={onCopyNsec} setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
         relayStates={relayStates} onRetryRelays={onRetryRelays} primalEnabled={primalEnabled} onPrimalChange={onPrimalChange} />}
       {showProfileModal && <ProfileModal setShowProfileModal={setShowProfileModal} darkMode={darkMode} />}
     </div>
