@@ -18,11 +18,13 @@ interface ConversationListProps {
   setDarkMode: (value: boolean) => void;
   history: ReturnType<typeof useHistory>;
   relays: string[];
+  primalEnabled: boolean;
+  onPrimalChange: (enabled: boolean) => void;
   onRelaysChange: (relays: string[]) => void;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  conversations, onSelect, darkMode, setDarkMode, history, relays, onRelaysChange,
+  conversations, onSelect, darkMode, setDarkMode, history, relays, onRelaysChange, primalEnabled, onPrimalChange,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
@@ -76,6 +78,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
         </button>
       </div>
 
+      {!primalEnabled && (
+        <div className={styles.primalHistory}>
+          <button onClick={() => onPrimalChange(true)}>Load history from Primal</button>
+          <small>Primal receives your public key and your conversation partners’ public keys. Messages are decrypted on this device.</small>
+        </div>
+      )}
+
       <div aria-label="Conversations" role="region" className={styles.conversationsContainer}>
         {conversations.map(conversation => (
           <button type="button" key={conversation.pubkey} className={styles.conversationItem}
@@ -94,7 +103,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
         />
       )}
 
-      {showSettings && <SettingsPage setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange} />}
+      {showSettings && <SettingsPage setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
+        primalEnabled={primalEnabled} onPrimalChange={onPrimalChange} />}
       {showProfileModal && <ProfileModal setShowProfileModal={setShowProfileModal} darkMode={darkMode} />}
     </div>
   );

@@ -20,8 +20,9 @@ export function relay(events = []) {
 
 // Every WebSocket is intercepted locally. Fixtures still pass through the
 // production signature verification, recipient filters and NIP-04 decryption.
-export async function login(page, user, servers, initial = Object.keys(servers)) {
+export async function login(page, user, servers, initial = Object.keys(servers), primalSocket) {
   await page.routeWebSocket(/.*/, ws => {
+    if (ws.url() === 'wss://cache2.primal.net/v1' && primalSocket) return primalSocket(ws);
     const server = servers[new URL(ws.url()).hostname];
     if (!server) throw new Error('Unexpected relay ' + ws.url());
     server.sockets.add(ws);

@@ -3,9 +3,10 @@ import { getPublicKey } from 'nostr-tools/pure';
 import type { Event as NostrEvent } from 'nostr-tools';
 import useHistory from '../hooks/useHistory';
 import useProfiles from '../hooks/useProfiles';
+import { PrimalHistory } from '../utils/primalHistory';
 import { conversationPeer } from '../utils/history';
 import { decodeNsec, encodeNpub, pool } from '../utils/nostr';
-import { getNsec, getRelays, getDarkMode, setRelays } from '../utils/storage';
+import { getNsec, getRelays, getDarkMode, setRelays, primalHistoryEnabled, setPrimalHistoryEnabled } from '../utils/storage';
 import ConversationList from './ConversationList';
 import MessageList from './MessageList';
 import styles from './ChatPage.module.css';
@@ -18,6 +19,7 @@ export interface Conversation {
 
 export default function ChatPage() {
   const [keys, setKeys] = useState<{ sk: Uint8Array; pk: string } | null>(null);
+  const [primalEnabled, setPrimalEnabled] = useState(false);
   const [keyError, setKeyError] = useState(false);
   const [relays, setRelayState] = useState(getRelays);
   const [latest, setLatest] = useState<Record<string, number>>({});
@@ -31,7 +33,9 @@ export default function ChatPage() {
       if (!active) return;
       if (!nsec) throw new Error();
       const sk = decodeNsec(nsec);
-      setKeys({ sk, pk: getPublicKey(sk) });
+      const pk = getPublicKey(sk);
+      setPrimalEnabled(primalHistoryEnabled(pk));
+      setKeys({ sk, pk });
     }).catch(() => { if (active) setKeyError(true); });
     return () => { active = false; };
   }, []);
@@ -39,14 +43,17 @@ export default function ChatPage() {
   useEffect(() => () => pool.destroy(), [relays]);
   useEffect(() => {
     const update = () => setMobile(window.innerWidth < 768);
-    const storage = (e: StorageEvent) => { if (e.key === 'relays' || e.key === null) setRelayState(getRelays()); };
+    const storage = (e: StorageEvent) => {
+      if (e.key === 'relays' || e.key === null) setRelayState(getRelays());
+      if (keys && (e.key === 'primalHistory:' + keys.pk || e.key === null)) setPrimalEnabled(primalHistoryEnabled(keys.pk));
+    };
     window.addEventListener('resize', update);
     window.addEventListener('storage', storage);
     return () => {
       window.removeEventListener('resize', update);
       window.removeEventListener('storage', storage);
     };
-  }, []);
+  }, [keys]);
   useEffect(() => { document.body.classList.toggle('darkMode', darkMode); }, [darkMode]);
 
   const pk = keys?.pk || '';
@@ -55,9 +62,16 @@ export default function ChatPage() {
     if (!peer) return;
     setLatest(prev => (prev[peer] ?? -1) >= event.created_at ? prev : { ...prev, [peer]: event.created_at });
   }, [pk]);
-  const history = useHistory(relays, pk, undefined, receive);
   const peers = useMemo(() => Object.keys(latest).sort((a, b) => latest[b] - latest[a] || a.localeCompare(b)), [latest]);
-  const profiles = useProfiles(relays, peers);
+  const { profiles, acceptProfile } = useProfiles(relays, peers);
+  const archive = useMemo(() => pk && primalEnabled ? new PrimalHistory(pk, acceptProfile) : null, [pk, primalEnabled, acceptProfile]);
+  useEffect(() => () => archive?.close(), [archive]);
+  const history = useHistory(relays, pk, undefined, receive, archive);
+  function changePrimal(enabled: boolean) {
+    if (!pk) return;
+    setPrimalHistoryEnabled(pk, enabled);
+    setPrimalEnabled(enabled);
+  }
   const conversations = peers.map(pubkey => ({
     pubkey, name: profiles[pubkey]?.name || encodeNpub(pubkey), picture: profiles[pubkey]?.picture,
   }));
@@ -73,9 +87,9 @@ export default function ChatPage() {
 
   if (keyError) return <p role="alert">Your account key could not be read. Reopen MeShell to try again.</p>;
   if (!keys) return <p role="status">Opening your inbox…</p>;
-  const sidebar = <ConversationList {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays} />;
+  const sidebar = <ConversationList {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays} primalEnabled={primalEnabled} onPrimalChange={changePrimal} />;
   const thread = current && <MessageList key={current.pubkey} conversation={current} isDarkMode={darkMode}
-    account={keys} relays={relays} onBack={mobile ? () => setSelected(null) : undefined} />;
+    account={keys} relays={relays} archive={archive} onBack={mobile ? () => setSelected(null) : undefined} />;
   return (
     <div className={styles.chatPage}>
       {mobile ? (thread || sidebar) : <>

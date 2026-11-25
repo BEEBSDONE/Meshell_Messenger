@@ -3,12 +3,14 @@ import { normalizeRelayUrl, removeNsec, removeRelays, removePrivateKey, removeDa
 import styles from './SettingsPage.module.css';
 
 interface SettingsPageProps {
+  primalEnabled: boolean;
+  onPrimalChange: (enabled: boolean) => void;
   relayList: string[];
   onChange: (relays: string[]) => void;
   setShowSettings: (show: boolean) => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ setShowSettings, relayList, onChange }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ setShowSettings, relayList, onChange, primalEnabled, onPrimalChange }) => {
   const [relayInput, setRelayInput] = useState('');
   const addRelay = () => {
     const relay = normalizeRelayUrl(relayInput);
@@ -31,6 +33,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ setShowSettings, relayList,
   };
 
   const logout = async () => {
+    onPrimalChange(false);
     await removeNsec();
     removeDarkMode();
     removePrivateKey();
@@ -60,6 +63,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ setShowSettings, relayList,
         <button className={styles.addRelayButton} onClick={addRelay}>
           Add Relay
         </button>
+        <label>
+          <input type="checkbox" checked={primalEnabled} onChange={e => onPrimalChange(e.target.checked)} />
+          Read history from Primal
+        </label>
+        <small>Primal receives your public key and your conversation partners’ public keys.</small>
         <button className={styles.logout} onClick={logout}>
           Logout
         </button>
