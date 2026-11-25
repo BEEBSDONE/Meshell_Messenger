@@ -92,10 +92,17 @@
 .dot[data-state='failed'] { background-color: #c5303e; }
 :global(.darkMode) .dot { background-color: #a3a3a3; }
 :global(.darkMode) .dot[data-state='synced'] { background-color: #4ade80; }
-:global(.darkMode) .dot[data-state='failed'] { background-color: #fb7185; }
+:global(.darkMode) .dot[data-state='failed'] { background-color: #ff6767; }
 
 .retry {
   align-self: flex-end;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--border-color-light);
+  border-radius: 4px;
+  background-color: var(--bg-color-light);
+  color: var(--text-color-light);
+  font-size: 0.875rem;
   cursor: pointer;
   margin: -12px 0 12px;
 }

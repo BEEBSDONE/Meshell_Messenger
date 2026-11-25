@@ -61,7 +61,7 @@ test('dark phone Settings keeps the black Close label, status dots and long rela
   await expect(good).toHaveAccessibleName('Synced');
   await expect(bad).toHaveAccessibleName('Not synced');
   await expect(good).toHaveCSS('background-color', 'rgb(74, 222, 128)');
-  await expect(bad).toHaveCSS('background-color', 'rgb(251, 113, 133)');
+  await expect(bad).toHaveCSS('background-color', 'rgb(255, 103, 103)');
   const longRow = dialog.getByRole('listitem').filter({ hasText: long });
   await expect(longRow.getByRole('img')).toHaveAccessibleName('Synced');
   const remove = await longRow.getByRole('button', { name: 'Remove' }).boundingBox();
