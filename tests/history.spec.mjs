@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { finalizeEvent, verifyEvent } from 'nostr-tools/pure';
-import { nip04 } from 'nostr-tools';
-import { dm, dot, identity, login as signIn, openSettings, relay } from './relay.mjs';
+import { unwrapEvent } from 'nostr-tools/nip59';
+import { dm, dot, identity, inboxList, login as signIn, openSettings, relay } from './relay.mjs';
 
 const contact = (page, who) => page.getByRole('button', { name: who.npub, exact: true });
 const thread = page => page.getByRole('region', { name: 'Messages', exact: true });
@@ -111,6 +111,7 @@ test('silence times out, and a completed empty query is distinguishable after re
 test('acknowledgement failure keeps the draft; retry signs once and a relay echo appears once', async ({ page }) => {
   const me = identity(), peer = identity();
   const a = relay([await dm(peer, me, 1, 'hello')]), b = relay();
+  a.events.push(inboxList(me, ['b.test']), inboxList(peer, ['b.test']));
   a.rejectWrites = b.rejectWrites = true;
   await login(page, me, { 'a.test': a, 'b.test': b });
   await contact(page, peer).click();
@@ -121,13 +122,15 @@ test('acknowledgement failure keeps the draft; retry signs once and a relay echo
   await expect(page.getByRole('alert')).toContainText('No relay confirmed');
   await expect(input).toHaveValue(text);
   b.rejectWrites = false;
-  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(thread(page).getByText(text, { exact: true })).toHaveCount(1);
   await expect(input).toHaveValue('');
-  expect(b.writes).toHaveLength(2);
-  expect(b.writes[0].id).toBe(b.writes[1].id);
-  expect(verifyEvent(b.writes[1])).toBe(true);
-  expect(await nip04.decrypt(peer.sk, me.pk, b.writes[1].content)).toBe(text);
+  const addressed = b.writes.filter(event => event.tags[0][1] === peer.pk);
+  expect(addressed).toHaveLength(2);
+  expect(addressed[0].id).toBe(addressed[1].id);
+  expect(verifyEvent(addressed[1])).toBe(true);
+  expect(unwrapEvent(addressed[1], peer.sk).content).toBe(text);
+  expect(a.writes).toHaveLength(0);
 });
 
 test('changing relays immediately recovers a mobile inbox and leaving the thread closes peer subscriptions', async ({ page }) => {

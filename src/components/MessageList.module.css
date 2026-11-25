@@ -156,3 +156,6 @@
   color: #999;
 }
 
+.sendNotice { padding: .5rem .75rem; font-size: .875rem; }
+.sendNotice button { margin-left: .5rem; }
+.legacyLookup { display: block; align-self: center; margin: .5rem; cursor: pointer; }

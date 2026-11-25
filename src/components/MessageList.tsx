@@ -1,11 +1,13 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Event } from 'nostr-tools';
 import * as nip04 from 'nostr-tools/nip04';
-import useHistory from '../hooks/useHistory';
+import useSendMessage from '../hooks/useSendMessage';
+import type { InboxRelays } from '../hooks/useInboxRelays';
+import type { Rumor } from '../utils/privateMessages';
+import useHistory, { type RelayHistory } from '../hooks/useHistory';
 import type { ThreadRelayStatus } from '../hooks/useRelaySettings';
 import type { PrimalHistory } from '../utils/primalHistory';
 import { conversationPeer } from '../utils/history';
-import { createEvent, KIND_ENCRYPTED_DIRECT_MESSAGE, publishConfirmed } from '../utils/nostr';
 import type { Conversation } from './ChatPage';
 import HistoryControls from './HistoryControls';
 import ProfilePicture from './ProfilePicture';
@@ -13,6 +15,11 @@ import styles from './MessageList.module.css';
 
 interface Props {
   archive: PrimalHistory | null;
+  hasLegacy: boolean;
+  dmInbox: InboxRelays;
+  giftHistory: RelayHistory;
+  privateMessages?: Record<string, Rumor>;
+  acceptWrap: (event: Event) => void;
   account: { sk: Uint8Array; pk: string };
   conversation: Conversation;
   relays: string[];
@@ -28,16 +35,14 @@ interface Message {
   text: string | null;
 }
 
-export default function MessageList({ account, conversation, relays, archive, isDarkMode, onBack, onRelayStatus }: Props) {
+export default function MessageList({ account, conversation, relays, archive, hasLegacy, dmInbox, giftHistory, privateMessages, acceptWrap, isDarkMode, onBack, onRelayStatus }: Props) {
   const { pk, sk } = account;
   const peer = conversation.pubkey;
   const [byId, setById] = useState<Record<string, Message>>({});
-  const [inputValue, setInputValue] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState(false);
-  const draft = useRef<{ text: string; event: Event } | null>(null);
+  const [searchLegacy, setSearchLegacy] = useState(false);
+  const readLegacy = hasLegacy || searchLegacy;
+  const composer = useSendMessage(account, peer, relays, dmInbox, acceptWrap);
   const active = useRef(true);
-  const pending = useRef(false);
   const scrollBox = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
 
@@ -60,47 +65,23 @@ export default function MessageList({ account, conversation, relays, archive, is
       store(event, null);
     }
   }, [peer, pk, sk, store]);
-  const history = useHistory(relays, pk, peer, receive, archive);
+  const history = useHistory(relays, pk, peer, receive, readLegacy ? archive : null, giftHistory, readLegacy);
   const { byRelay } = history.status;
   const { retry } = history;
   useEffect(() => {
     onRelayStatus({ peer, relays, byRelay, retry });
   }, [peer, relays, byRelay, retry, onRelayStatus]);
-  const messages = useMemo(() => Object.values(byId).sort((a, b) => a.time - b.time || a.id.localeCompare(b.id)), [byId]);
+  const messages = useMemo(() => {
+    const modern = Object.values(privateMessages ?? {}).map(rumor => ({
+      id: rumor.id, sent: rumor.pubkey === pk, time: rumor.created_at, text: rumor.content,
+    }));
+    return [...Object.values(byId), ...modern].sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
+  }, [byId, privateMessages, pk]);
 
   useLayoutEffect(() => {
     const box = scrollBox.current;
     if (box && followLatest.current) box.scrollTop = box.scrollHeight;
   }, [messages]);
-
-  async function sendMessage() {
-    const text = inputValue.trim();
-    if (!text || pending.current) return;
-    pending.current = true;
-    setSending(true);
-    setSendError(false);
-    try {
-      if (!draft.current || draft.current.text !== text) {
-        const content = await nip04.encrypt(sk, peer, text);
-        if (!active.current) return;
-        draft.current = { text, event: createEvent(sk, {
-          kind: KIND_ENCRYPTED_DIRECT_MESSAGE, tags: [['p', peer]], content,
-        }) };
-      }
-      const { event } = draft.current;
-      await publishConfirmed(relays, event);
-      if (!active.current) return;
-      followLatest.current = true;
-      store(event, text);
-      draft.current = null;
-      setInputValue('');
-    } catch {
-      if (active.current) setSendError(true);
-    } finally {
-      pending.current = false;
-      if (active.current) setSending(false);
-    }
-  }
 
   return (
     <div className={`${styles.messageListContainer} ${isDarkMode ? styles.darkMode : ''}`}>
@@ -113,6 +94,7 @@ export default function MessageList({ account, conversation, relays, archive, is
         const box = e.currentTarget;
         followLatest.current = box.scrollHeight - box.scrollTop - box.clientHeight < 32;
       }}>
+        {!readLegacy && <button className={styles.legacyLookup} onClick={() => setSearchLegacy(true)}>Look for legacy messages</button>}
         <HistoryControls history={history} items="messages" empty={!messages.length} />
         {messages.map((message, i) => {
           const date = new Date(message.time * 1000);
@@ -130,10 +112,13 @@ export default function MessageList({ account, conversation, relays, archive, is
           );
         })}
       </div>
-      {sendError && <div role="alert">No relay confirmed this message. Your draft is ready to retry.</div>}
-      <form className={styles.inputContainer} onSubmit={e => { e.preventDefault(); void sendMessage(); }}>
-        <input aria-label="Message" value={inputValue} disabled={sending} onChange={e => setInputValue(e.target.value)} placeholder="Type your message..." />
-        <button disabled={sending || !inputValue.trim()}>{sending ? 'Sending…' : 'Send'}</button>
+      {composer.error && <div role="alert" className={styles.sendNotice}>{composer.error}
+        {composer.draft && !composer.draft.delivered && !composer.busy && <button onClick={composer.discard}>Edit draft</button>}
+      </div>}
+      <form className={styles.inputContainer} onSubmit={e => { e.preventDefault(); followLatest.current = true; void composer.send(); }}>
+        <input aria-label="Message" value={composer.text} disabled={composer.busy || composer.restoring} readOnly={!!composer.draft}
+          onChange={e => composer.setText(e.target.value)} placeholder="Type your message..." />
+        <button disabled={composer.busy || composer.restoring || !composer.text.trim()}>{composer.busy ? 'Sending…' : composer.draft ? 'Retry' : 'Send'}</button>
       </form>
     </div>
   );

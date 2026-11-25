@@ -37,7 +37,7 @@ export default function useRelaySettings(
   const states: RelayStates = {};
   for (const url of relays) {
     const inboxState = inbox.status.byRelay[url] ?? 'checking';
-    let threadState = selected ? (active?.byRelay[url] ?? 'checking') : undefined;
+    let threadState = selected ? (active?.byRelay[url] ?? inboxState) : undefined;
     if (!selected && recent?.byRelay[url] === 'failed') {
       threadState = check?.urls.includes(url) ? 'checking' : 'failed';
     }

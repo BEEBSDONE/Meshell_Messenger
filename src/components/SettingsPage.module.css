@@ -203,3 +203,28 @@
   --border-color-dark: #333;
 }
 
+
+.confirmation {
+  box-sizing: border-box;
+  width: min(24rem, calc(100% - 2rem));
+  padding: 1.5rem;
+  border: 1px solid var(--border-color-light);
+  border-radius: 10px;
+  color: var(--text-color-light);
+  background: var(--bg-color-light);
+}
+.confirmation::backdrop { background: rgb(0 0 0 / 65%); }
+.confirmation h2 { margin: 0; font-size: 1.25rem; }
+.confirmation p { line-height: 1.5; }
+.confirmActions { display: flex; gap: .75rem; }
+.confirmActions button { flex: 1; min-height: 44px; margin: 0; }
+.confirmActions .logout { background: #b91c1c; color: white; }
+.copyKey { border: 1px solid #aaa; border-radius: 4px; background: #e5e7eb; color: #151515; cursor: pointer; }
+.copyStatus { font-size: .875rem; margin-bottom: 0; }
+.copyStatus:empty { margin: 0; }
+.inbox { align-self: stretch; margin-bottom: 1rem; overflow-wrap: anywhere; }
+.inbox h3 { margin: 0; font-size: 1rem; }
+.inbox p { font-size: .875rem; margin: .4rem 0; }
+.inbox button { min-height: 40px; padding: .4rem .8rem; cursor: pointer; }
+.inbox small { display: block; }
+.inbox label { display: flex; align-items: center; gap: .4rem; min-height: 32px; font-size: .875rem; text-align: start; }

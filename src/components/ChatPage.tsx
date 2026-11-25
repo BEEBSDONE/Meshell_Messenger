@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { nsecEncode } from 'nostr-tools/nip19';
 import { getPublicKey } from 'nostr-tools/pure';
 import type { Event as NostrEvent } from 'nostr-tools';
+import useInboxRelays from '../hooks/useInboxRelays';
+import usePrivateInbox from '../hooks/usePrivateInbox';
 import useHistory from '../hooks/useHistory';
 import useRelaySettings from '../hooks/useRelaySettings';
 import useProfiles from '../hooks/useProfiles';
 import { PrimalHistory } from '../utils/primalHistory';
 import { conversationPeer } from '../utils/history';
 import { decodeNsec, encodeNpub, pool } from '../utils/nostr';
-import { getNsec, getRelays, getDarkMode, setRelays, primalHistoryEnabled, setPrimalHistoryEnabled } from '../utils/storage';
+import { ACCOUNT_CHANGE, getNsec, getRelays, getDarkMode, setRelays, primalHistoryEnabled, setPrimalHistoryEnabled } from '../utils/storage';
 import ConversationList from './ConversationList';
 import MessageList from './MessageList';
 import styles from './ChatPage.module.css';
@@ -24,6 +27,7 @@ export default function ChatPage() {
   const [keyError, setKeyError] = useState(false);
   const [relays, setRelayState] = useState(getRelays);
   const [latest, setLatest] = useState<Record<string, number>>({});
+  const [legacyPeers, setLegacyPeers] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(getDarkMode);
   const [mobile, setMobile] = useState(window.innerWidth < 768);
@@ -45,6 +49,7 @@ export default function ChatPage() {
   useEffect(() => {
     const update = () => setMobile(window.innerWidth < 768);
     const storage = (e: StorageEvent) => {
+      if (e.key === ACCOUNT_CHANGE) { window.location.replace('/'); return; }
       if (e.key === 'relays' || e.key === null) setRelayState(getRelays());
       if (keys && (e.key === 'primalHistory:' + keys.pk || e.key === null)) setPrimalEnabled(primalHistoryEnabled(keys.pk));
     };
@@ -58,16 +63,22 @@ export default function ChatPage() {
   useEffect(() => { document.body.classList.toggle('darkMode', darkMode); }, [darkMode]);
 
   const pk = keys?.pk || '';
+  const notePeer = useCallback((peer: string, time: number) => {
+    setLatest(prev => (prev[peer] ?? -1) >= time ? prev : { ...prev, [peer]: time });
+  }, []);
+  const dmInbox = useInboxRelays(keys, relays);
+  const gifts = usePrivateInbox(keys, dmInbox, notePeer);
   const receive = useCallback((event: NostrEvent) => {
     const peer = conversationPeer(event, pk);
     if (!peer) return;
-    setLatest(prev => (prev[peer] ?? -1) >= event.created_at ? prev : { ...prev, [peer]: event.created_at });
-  }, [pk]);
+    setLegacyPeers(prev => prev.has(peer) ? prev : new Set(prev).add(peer));
+    notePeer(peer, event.created_at);
+  }, [pk, notePeer]);
   const peers = useMemo(() => Object.keys(latest).sort((a, b) => latest[b] - latest[a] || a.localeCompare(b)), [latest]);
   const { profiles, acceptProfile } = useProfiles(relays, peers);
   const archive = useMemo(() => pk && primalEnabled ? new PrimalHistory(pk, acceptProfile) : null, [pk, primalEnabled, acceptProfile]);
   useEffect(() => () => archive?.close(), [archive]);
-  const history = useHistory(relays, pk, undefined, receive, archive);
+  const history = useHistory(relays, pk, undefined, receive, archive, gifts.history);
   const relaySettings = useRelaySettings(relays, pk, selected, history, receive);
   function changePrimal(enabled: boolean) {
     if (!pk) return;
@@ -89,10 +100,12 @@ export default function ChatPage() {
 
   if (keyError) return <p role="alert">Your account key could not be read. Reopen MeShell to try again.</p>;
   if (!keys) return <p role="status">Opening your inbox…</p>;
-  const sidebar = <ConversationList {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays}
+  const sidebar = <ConversationList dmInbox={dmInbox} giftHistory={gifts.history} {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays}
+    onCopyNsec={() => navigator.clipboard.writeText(nsecEncode(keys.sk))}
     relayStates={relaySettings.states} onRetryRelays={relaySettings.retry} primalEnabled={primalEnabled} onPrimalChange={changePrimal} />;
   const thread = current && <MessageList key={current.pubkey} conversation={current} isDarkMode={darkMode}
-    account={keys} relays={relays} archive={archive} onRelayStatus={relaySettings.reportThread} onBack={mobile ? () => setSelected(null) : undefined} />;
+    account={keys} relays={relays} archive={archive} hasLegacy={legacyPeers.has(current.pubkey)}
+    dmInbox={dmInbox} giftHistory={gifts.history} privateMessages={gifts.threads[current.pubkey]} acceptWrap={gifts.accept} onRelayStatus={relaySettings.reportThread} onBack={mobile ? () => setSelected(null) : undefined} />;
   return (
     <div className={styles.chatPage}>
       {mobile ? (thread || sidebar) : <>
