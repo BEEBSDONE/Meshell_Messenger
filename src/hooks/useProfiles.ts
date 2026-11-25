@@ -42,7 +42,7 @@ export default function useProfiles(relays: string[], peers: string[]) {
       for (let i = 0; i < missing.length; i += 50) {
         const authors = missing.slice(i, i + 50);
         authors.forEach(pk => session.requested.add(pk));
-        const sub = pool.subscribeManyEose(session.relays, [{ kinds: [0], authors }], {
+        const sub = pool.subscribeEose(session.relays, { kinds: [0], authors }, {
           maxWait: 8_000,
           onevent(event) { if (session.active) acceptProfile(event); },
           onclose: () => session.subs.delete(sub),

@@ -31,8 +31,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
       const relays = getRelays();
       if (!relays.length) return;
       let newest: { time: number; id: string } | undefined;
-      metadata = pool.subscribeManyEose(relays, [{ authors: [pubkey], kinds: [0] }], {
+      metadata = pool.subscribeEose(relays, { authors: [pubkey], kinds: [0] }, {
         maxWait: 8_000,
+        onclose: () => { metadata = undefined; },
         onevent(event) {
           if (!active || (newest && (newest.time > event.created_at ||
             (newest.time === event.created_at && newest.id <= event.id)))) return;

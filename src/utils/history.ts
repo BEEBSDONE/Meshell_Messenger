@@ -53,7 +53,7 @@ export function conversationPeer(event: Event, account: string): string | undefi
   if (recipient === account) return event.pubkey;
 }
 
-// nostr-tools 2.7 also calls oneose on its own timer. Our earlier deadline
+// nostr-tools also calls oneose on its own timer. Our earlier deadline
 // keeps a timeout or CLOSED response retryable instead of marking history complete.
 function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, receive: (event: Event) => boolean) {
   return new Promise<{ oldest: number; count: number; added: boolean }>((resolve, reject) => {
@@ -61,17 +61,18 @@ function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, rec
     let added = false;
     const ids = new Set<string>();
     let finished = false;
-    const finish = (error?: Error) => {
+    const finish = (error?: Error, alreadyClosed = false) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       signal.removeEventListener('abort', abort);
-      subscription.close();
+      if (!alreadyClosed) subscription.close();
       if (error) reject(error);
       else resolve({ oldest, count: ids.size, added });
     };
     const abort = () => finish(new Error('History request cancelled'));
-    const subscription = relay.prepareSubscription([filter], {
+    if (signal.aborted) { reject(new Error('History request cancelled')); return; }
+    const subscription = relay.subscribe([filter], {
       eoseTimeout: TIMEOUT * 2,
       onevent(event) {
         if (finished || ids.has(event.id)) return;
@@ -80,12 +81,10 @@ function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, rec
         if (receive(event)) added = true;
       },
       oneose: () => finish(),
-      onclose: () => finish(new Error('Relay closed history request')),
+      onclose: () => finish(new Error('Relay closed history request'), true),
     });
     const timer = setTimeout(() => finish(new Error('Relay history timed out')), TIMEOUT);
     signal.addEventListener('abort', abort, { once: true });
-    if (signal.aborted) abort();
-    else subscription.fire();
   });
 }
 

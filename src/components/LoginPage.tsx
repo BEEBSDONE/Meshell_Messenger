@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import DOMPurify from 'dompurify'; // Import DOMPurify
 import { storeNsec, getDarkMode } from '../utils/storage'; // Added getDarkMode for dark mode persistence
 import { decodeNsec } from '../utils/nostr';
