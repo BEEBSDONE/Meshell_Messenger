@@ -1,6 +1,7 @@
 /* Settings modal container */
 .settingsPage {
   position: fixed;
+  z-index: 10;
   top: 0;
   left: 0;
   width: 100%;
@@ -16,6 +17,9 @@
   padding: 20px;
   border-radius: 8px;
   width: 400px;
+  max-width: calc(100% - 12px);
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -46,8 +50,9 @@
 }
 
 .relayItem {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 12px;
+  gap: 8px;
   align-items: center;
   padding: 5px;
   background-color: var(--bg-color-light);
@@ -56,13 +61,58 @@
   margin-bottom: 10px;
 }
 
+.relayAddress {
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #737373;
+}
+.dot[data-state='synced'] { background-color: #16803d; }
+.dot[data-state='failed'] { background-color: #c5303e; }
+:global(.darkMode) .dot { background-color: #a3a3a3; }
+:global(.darkMode) .dot[data-state='synced'] { background-color: #4ade80; }
+:global(.darkMode) .dot[data-state='failed'] { background-color: #ff6767; }
+
+.retry {
+  align-self: flex-end;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--border-color-light);
+  border-radius: 4px;
+  background-color: var(--bg-color-light);
+  color: var(--text-color-light);
+  font-size: 0.875rem;
+  cursor: pointer;
+  margin: -12px 0 12px;
+}
+
 .darkMode .relayItem {
   background-color: var(--bg-color-dark);
   border: 1px solid var(--border-color-dark);
 }
 
 .relayItem button {
-  margin-left: 10px;
   padding: 6px 12px;
   border-radius: 4px;
   background-color: var(--bg-color-light);
@@ -136,11 +186,11 @@
 
 .close {
   background-color: var(--border-color-light);
+  color: #000;
 }
 
-.darkMode .close {
-  background-color: var(--border-color-dark);
-  color: var(--text-color-dark);
+:global(.darkMode) .close {
+  background-color: #d1d5db;
 }
 
 /* Ensure global variables are used */

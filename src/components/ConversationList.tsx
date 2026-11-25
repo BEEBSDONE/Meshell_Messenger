@@ -9,6 +9,7 @@ import MeshellLogo from '../assets/MeShell_Logo.svg';
 
 import type { Conversation } from './ChatPage';
 import type useHistory from '../hooks/useHistory';
+import type { RelayStates } from '../utils/history';
 import HistoryControls from './HistoryControls';
 
 interface ConversationListProps {
@@ -18,13 +19,15 @@ interface ConversationListProps {
   setDarkMode: (value: boolean) => void;
   history: ReturnType<typeof useHistory>;
   relays: string[];
+  relayStates: RelayStates;
+  onRetryRelays: () => void;
   primalEnabled: boolean;
   onPrimalChange: (enabled: boolean) => void;
   onRelaysChange: (relays: string[]) => void;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  conversations, onSelect, darkMode, setDarkMode, history, relays, onRelaysChange, primalEnabled, onPrimalChange,
+  conversations, onSelect, darkMode, setDarkMode, history, relays, relayStates, onRetryRelays, onRelaysChange, primalEnabled, onPrimalChange,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
@@ -53,12 +56,12 @@ const ConversationList: React.FC<ConversationListProps> = ({
               <div className={styles.dropdownItem} onClick={() => { setShowProfileModal(true); setIsDropdownOpen(false); }}>
                 Profile
               </div>
-              <div className={styles.dropdownItem} onClick={() => { setShowSettings(true); setIsDropdownOpen(false); }}>
+              <button type="button" className={styles.dropdownItem} onClick={() => { setShowSettings(true); setIsDropdownOpen(false); }}>
                 Settings
-              </div>
+              </button>
               <div className={styles.dropdownItem}>
                 <label className={styles.switch}>
-                  <input type="checkbox" checked={darkMode} onChange={toggleDarkMode} />
+                  <input type="checkbox" aria-label="Dark mode" checked={darkMode} onChange={toggleDarkMode} />
                   <span className={styles.slider}>
                     {darkMode ? (
                       <i className={styles.moonIcon}></i>
@@ -77,13 +80,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
           +
         </button>
       </div>
-
-      {!primalEnabled && (
-        <div className={styles.primalHistory}>
-          <button onClick={() => onPrimalChange(true)}>Load history from Primal</button>
-          <small>Primal receives your public key and your conversation partners’ public keys. Messages are decrypted on this device.</small>
-        </div>
-      )}
 
       <div aria-label="Conversations" role="region" className={styles.conversationsContainer}>
         {conversations.map(conversation => (
@@ -104,7 +100,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       )}
 
       {showSettings && <SettingsPage setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
-        primalEnabled={primalEnabled} onPrimalChange={onPrimalChange} />}
+        relayStates={relayStates} onRetryRelays={onRetryRelays} primalEnabled={primalEnabled} onPrimalChange={onPrimalChange} />}
       {showProfileModal && <ProfileModal setShowProfileModal={setShowProfileModal} darkMode={darkMode} />}
     </div>
   );

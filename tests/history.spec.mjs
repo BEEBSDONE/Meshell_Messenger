@@ -1,11 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { finalizeEvent, verifyEvent } from 'nostr-tools/pure';
 import { nip04 } from 'nostr-tools';
-import { dm, identity, login, relay } from './relay.mjs';
+import { dm, dot, identity, login as signIn, openSettings, relay } from './relay.mjs';
 
 const contact = (page, who) => page.getByRole('button', { name: who.npub, exact: true });
 const thread = page => page.getByRole('region', { name: 'Messages', exact: true });
 const inbox = page => page.getByRole('region', { name: 'Conversations' });
+
+// Exercise the ordinary relay reader independently with a saved Primal opt-out.
+async function login(page, user, ...args) {
+  await page.addInitScript(pk => localStorage.setItem('primalHistory:' + pk, 'disabled'), user.pk);
+  await signIn(page, user, ...args);
+}
 
 test('incoming and sent-only contacts survive missing or malformed profiles, duplicate relays and reopening', async ({ page }) => {
   const me = identity(), alice = identity(), bob = identity();
@@ -73,11 +79,15 @@ test('rejected history stays retryable; a healthy relay still supplies the inbox
   const down = relay([await dm(peer, me, 1, 'restored')]), healthy = relay([await dm(reachable, me, 2, 'available')]);
   down.rejectReads = true;
   await login(page, me, { 'a.test': down, 'b.test': healthy });
-  await expect(inbox(page)).toContainText('1 of 2 relays could not sync');
   await expect(contact(page, reachable)).toBeVisible();
   await expect(inbox(page)).not.toContainText('No conversations found');
+  const settings = await openSettings(page);
+  await expect(dot(settings, 'wss://a.test')).toHaveAccessibleName('Not synced');
+  await expect(dot(settings, 'wss://b.test')).toHaveAccessibleName('Synced');
   down.rejectReads = false;
-  await inbox(page).getByRole('button', { name: 'Retry' }).click();
+  await settings.getByRole('button', { name: 'Retry sync' }).click();
+  await expect(dot(settings, 'wss://a.test')).toHaveAccessibleName('Synced');
+  await settings.getByRole('button', { name: 'Close' }).click();
   await contact(page, peer).click();
   await expect(thread(page)).toContainText('restored');
   await expect(inbox(page)).not.toContainText('could not sync');
@@ -88,9 +98,13 @@ test('silence times out, and a completed empty query is distinguishable after re
   server.silent = true;
   await login(page, me, { 'a.test': server });
   await expect(inbox(page)).toContainText('Loading conversations');
-  await expect(inbox(page)).toContainText('1 of 1 relays could not sync', { timeout: 15_000 });
+  const settings = await openSettings(page);
+  await expect(dot(settings, 'wss://a.test')).toHaveAccessibleName('Checking');
+  await expect(dot(settings, 'wss://a.test')).toHaveAccessibleName('Not synced', { timeout: 15_000 });
   server.silent = false;
-  await inbox(page).getByRole('button', { name: 'Retry' }).click();
+  await settings.getByRole('button', { name: 'Retry sync' }).click();
+  await expect(dot(settings, 'wss://a.test')).toHaveAccessibleName('Synced');
+  await settings.getByRole('button', { name: 'Close' }).click();
   await expect(inbox(page)).toContainText('No conversations found');
 });
 
@@ -141,9 +155,12 @@ test('reconnecting refetches the head and keeps messages received before disconn
   await contact(page, peer).click();
   await expect(thread(page)).toContainText('before disconnect');
   for (const socket of server.sockets) socket.close({ code: 1001 });
-  await expect(thread(page)).toContainText('1 of 1 relays could not sync');
+  const settings = await openSettings(page);
+  await expect(dot(settings, 'wss://a.test')).toHaveAccessibleName('Not synced');
   server.events.push(await dm(peer, me, 11, 'during disconnect'));
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(dot(settings, 'wss://a.test')).toHaveAccessibleName('Synced');
+  await settings.getByRole('button', { name: 'Close' }).click();
   await expect(thread(page)).toContainText('during disconnect');
   await expect(thread(page).getByText('before disconnect', { exact: true })).toHaveCount(1);
 });

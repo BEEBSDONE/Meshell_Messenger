@@ -107,6 +107,15 @@
   cursor: pointer;
 }
 
+:where(button).dropdownItem {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+
 .dropdownItem:hover {
   background-color: var(--hover-color-light); /* Light Mode hover */
 }
@@ -234,14 +243,3 @@ input:checked + .slider .moonIcon {
 input:not(:checked) + .slider .sunIcon {
   color: var(--primary-color-light);
 }
-
-.primalHistory {
-  display: grid;
-  gap: 6px;
-  justify-items: start;
-  padding: 12px;
-  border-bottom: 1px solid var(--border-color-light);
-  color: var(--text-color-light);
-}
-.primalHistory button { cursor: pointer; }
-.primalHistory small { line-height: 1.4; }

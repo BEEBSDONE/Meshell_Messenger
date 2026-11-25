@@ -1,11 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { finalizeEvent } from 'nostr-tools/pure';
-import { dm, identity, login, relay } from './relay.mjs';
+import { dm, dot, identity, login, openSettings, relay } from './relay.mjs';
 
 const inbox = page => page.getByRole('region', { name: 'Conversations' });
 const thread = page => page.getByRole('region', { name: 'Messages', exact: true });
 const contact = (page, name) => inbox(page).getByRole('button', { name, exact: true });
-const enable = page => page.getByRole('button', { name: 'Load history from Primal' }).click();
 const recipient = event => event.tags.find(t => t[0] === 'p')?.[1];
 const info = (kind, value) => ({ kind, content: JSON.stringify(value) });
 const pkOf = event => event.pubkey;
@@ -82,9 +81,9 @@ test('recovers Primal-only incoming and sent chats, names and reloads with four 
   const archive = archiveFixture(me, messages, [aliceProfile]);
   const relays = Object.fromEntries(['a.test','b.test','c.test','d.test'].map(host => [host, relay()]));
   await login(page, me, relays, Object.keys(relays), archive.connect);
-  await expect(inbox(page)).toContainText('No conversations found');
-  expect(archive.requests).toHaveLength(0);
-  await enable(page);
+  const settings = await openSettings(page);
+  await expect(settings.getByRole('checkbox', { name: 'Read history from Primal' })).toBeChecked();
+  await settings.getByRole('button', { name: 'Close' }).click();
   for (let i = 0; i < 2; i++) {
     if (i) await page.reload();
     await contact(page, 'Alice archive').click();
@@ -107,7 +106,6 @@ test('uses unsigned contact hints only for discovery and checks signatures and b
   archive.contacts.set(foreign.pk, { latest_at: 100, latest_event_id: fake.id, cnt: 1 });
   archive.extra = [wrong, fake, { kind: 4, content: 'incomplete' }];
   await login(page, me, {}, [], archive.connect);
-  await enable(page);
   await contact(page, alice.npub).click();
   await expect(thread(page)).toContainText('verified message');
   await expect(contact(page, foreign.npub)).toHaveCount(0);
@@ -127,7 +125,6 @@ test('older archive pages preserve same-second ties, earlier contacts and both d
   const archive = archiveFixture(me, events);
   archive.cap = 2;
   await login(page, me, {}, [], archive.connect);
-  await enable(page);
   await inbox(page).getByRole('button', { name: 'Load older conversations' }).click();
   await expect(contact(page, old.npub)).toBeVisible();
   await contact(page, peer.npub).click();
@@ -144,7 +141,6 @@ test('a missing preview is retryable on mobile while another archived chat stays
   archive.unavailablePeer = a.pk;
   await page.setViewportSize({ width: 390, height: 760 });
   await login(page, me, {}, [], archive.connect);
-  await enable(page);
   await expect(inbox(page)).toContainText('Primal could not finish loading history');
   await contact(page, b.npub).click();
   await expect(thread(page)).toContainText('received from B');
@@ -161,7 +157,6 @@ test('cache errors are retryable while relay conversations remain readable and d
   const archive = archiveFixture(me, [common, await dm(bob, me, 20, 'only in archive')]);
   archive.unavailable = true;
   await login(page, me, { 'live.test': relay([common]) }, ['live.test'], archive.connect);
-  await enable(page);
   await expect(inbox(page)).toContainText('Primal could not finish loading history');
   await contact(page, alice.npub).click();
   await expect(thread(page)).toContainText('on both sources');
@@ -179,9 +174,10 @@ test('shows an empty Primal result even when a configured relay rejects the requ
   const denied = relay();
   denied.rejectReads = true;
   await login(page, me, { 'offline.test': denied }, ['offline.test'], archive.connect);
-  await enable(page);
   await expect(inbox(page)).toContainText('Primal returned no archived conversations for this account');
-  await expect(inbox(page)).toContainText('1 of 1 relays could not sync');
+  const settings = await openSettings(page);
+  await expect(dot(settings, 'wss://offline.test')).toHaveAccessibleName('Not synced');
+  await settings.getByRole('button', { name: 'Close' }).click();
   await expect(inbox(page).getByRole('button', { name: 'Retry Primal' })).toHaveCount(0);
 });
 
@@ -192,7 +188,6 @@ test('cancels an old thread request and lets the user switch off future cache re
   ]);
   archive.heldPeer = a.pk;
   await login(page, me, { 'live.test': relay() }, ['live.test'], archive.connect);
-  await enable(page);
   await contact(page, a.npub).click();
   await expect.poll(() => archive.held.length).toBe(1);
   await contact(page, b.npub).click();
@@ -207,6 +202,12 @@ test('cancels an old thread request and lets the user switch off future cache re
   const count = archive.requests.length;
   await page.reload();
   await expect(inbox(page)).toContainText('No conversations found');
-  await expect(page.getByRole('button', { name: 'Load history from Primal' })).toBeVisible();
+  const settings = await openSettings(page);
+  const preference = settings.getByRole('checkbox', { name: 'Read history from Primal' });
+  await expect(preference).not.toBeChecked();
   expect(archive.requests).toHaveLength(count);
+  await preference.check();
+  await settings.getByRole('button', { name: 'Close' }).click();
+  await expect(contact(page, a.npub)).toBeVisible();
+  expect(archive.requests.length).toBeGreaterThan(count);
 });
