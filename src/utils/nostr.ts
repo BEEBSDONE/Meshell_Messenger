@@ -1,13 +1,10 @@
-import { SimplePool } from 'nostr-tools/pool'; // Correct import for SimplePool
-import {
-  nip19,
-  Event as NostrEvent,
-} from 'nostr-tools';
+import { SimplePool } from 'nostr-tools/pool';
+import * as nip19 from 'nostr-tools/nip19';
+import type { Event as NostrEvent } from 'nostr-tools/pure';
 import {
   finalizeEvent,
   verifyEvent,
 } from 'nostr-tools/pure';
-import { hexToBytes } from '@noble/hashes/utils';
 import { privateKeyFromSeedWords } from 'nostr-tools/nip06';
 
 // Event kinds
@@ -23,21 +20,8 @@ export const pool = new SimplePool();
 // Function to decode nsec (private key) using NIP-19
 export const decodeNsec = (nsec: string): Uint8Array => {
   const { type, data } = nip19.decode(nsec);
-  if (type !== 'nsec') throw new Error('Invalid nsec');
-
-  if (data instanceof Uint8Array) {
-    // Data is already Uint8Array
-    return data;
-  } else if (typeof data === 'string') {
-    // Data is hex string
-    return hexToBytes(data);
-  } else if (typeof data === 'object' && data !== null && 'privateKey' in data) {
-    // If data is an object with a privateKey property
-    const privateKeyHex = (data as { privateKey: string }).privateKey;
-    return hexToBytes(privateKeyHex);
-  } else {
-    throw new Error('Invalid data format in decoded nsec');
-  }
+  if (type !== 'nsec' || data.length !== 32) throw new Error('Invalid nsec');
+  return data;
 };
 
 // Function to encode npub (public key) using NIP-19
@@ -77,8 +61,7 @@ export const derivePrivateKeyFromMnemonic = (
   passphrase: string = '',
   accountIndex: number = 0
 ): Uint8Array => {
-  const privateKeyHex = privateKeyFromSeedWords(mnemonic, passphrase, accountIndex);
-  return hexToBytes(privateKeyHex);
+  return privateKeyFromSeedWords(mnemonic, passphrase, accountIndex);
 };
 
 // publish() returns one promise per relay. Resolve on the first acknowledgement.

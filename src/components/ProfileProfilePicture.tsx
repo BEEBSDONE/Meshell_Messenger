@@ -18,14 +18,9 @@ const ProfilePicture: React.FC<ProfilePictureProps> = ({ pubkey }) => {
 
       console.log('Subscribing to relays for profile picture:', relayUrls);
 
-      const sub = pool.subscribeMany(
+      const sub = pool.subscribe(
         relayUrls,
-        [
-          {
-            kinds: [0], // Kind 0: Metadata events
-            authors: [pubkey],
-          },
-        ],
+        { kinds: [0], authors: [pubkey] },
         {
           onevent: (event: NostrEvent) => {
             try {

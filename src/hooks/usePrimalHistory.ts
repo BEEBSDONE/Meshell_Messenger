@@ -6,7 +6,7 @@ type State = 'off' | 'loading' | 'more' | 'done' | 'empty' | 'error';
 
 export default function usePrimalHistory(archive: PrimalHistory | null, peer: string | undefined, onEvent: (event: Event) => void) {
   const [state, setState] = useState<State>('off');
-  const next = useRef<() => void>();
+  const next = useRef<(() => void) | undefined>(undefined);
   useEffect(() => {
     if (!archive) { setState('off'); return; }
     const controller = new AbortController();

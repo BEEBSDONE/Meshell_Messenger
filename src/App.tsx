@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router';
 import LoginPage from './components/LoginPage';
 import ChatPage from './components/ChatPage';
 import { getNsec } from './utils/storage';
 
-const RequireAuth: React.FC<{ children: JSX.Element }> = ({ children }) => {
+const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasNsec, setHasNsec] = useState(false);
   const location = useLocation();

@@ -1,0 +1,147 @@
+import { createDecipheriv, createECDH, createHash } from 'node:crypto';
+import { createServer } from 'node:http';
+import { test as base, expect } from '@playwright/test';
+import { finalizeEvent, verifyEvent } from 'nostr-tools/pure';
+import { nsecEncode, npubEncode } from 'nostr-tools/nip19';
+import { dm, identity, login, openSettings, relay } from './relay.mjs';
+
+// Signed and encrypted by the previously deployed nostr-tools 2.7.2, using
+// disposable secp256k1 scalars 1 (recipient) and 2 (sender) on local relays.
+const archived = {
+  kind: 4, created_at: 1712345678,
+  tags: [['p', '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798']],
+  content: 'HOvsekNDNO6Xm7XTdfqDdHqdvS22OVlTPvGAi9K2kz4=?iv=VvHSOUhF4n9eOjZTVTfCGw==',
+  pubkey: 'c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5',
+  id: '46570dd7430b38aede419cd3190f008417ca72ee90f0a8156c41a83709e1183d',
+  sig: 'a2379ea0d53a034958787c5e900351ea792ef3d74a35479c3fc58b2969b299bab8585c901559e8eb527e9f03732809a90c7c1fe48bda8d49b6365a4ea786578b',
+};
+
+const emptyArchive = ws => ws.onMessage(raw => {
+  const [command, id] = JSON.parse(String(raw));
+  if (command === 'REQ') ws.send(JSON.stringify(['EOSE', id]));
+});
+
+// Receive the actual File body over HTTP. WebKit's request inspector omits it.
+const test = base.extend({
+  avatarUploads: async ({ page }, use) => {
+    const uploads = [];
+    const server = createServer(async (req, res) => {
+      res.setHeader('access-control-allow-origin', '*');
+      res.setHeader('access-control-allow-methods', 'PUT, OPTIONS');
+      res.setHeader('access-control-allow-headers', 'authorization, content-type, x-sha-256');
+      if (req.method === 'OPTIONS') { res.writeHead(204).end(); return; }
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const body = Buffer.concat(chunks);
+      uploads.push({ path: req.url, method: req.method, headers: req.headers, body });
+      if (req.url !== '/cdn.satellite.earth/upload') { res.writeHead(503).end(); return; }
+      const sha256 = createHash('sha256').update(body).digest('hex');
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+        url: 'https://cdn.satellite.earth/' + sha256 + '.png', sha256, size: body.length, type: 'image/png',
+      }));
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      await page.addInitScript(origin => {
+        const fetch = window.fetch.bind(window);
+        window.fetch = (input, init) => {
+          const url = new URL(input instanceof Request ? input.url : input, location.href);
+          if (url.pathname === '/upload') return fetch(origin + '/' + url.host + url.pathname, init);
+          return fetch(input, init);
+        };
+      }, 'http://127.0.0.1:' + server.address().port);
+      await use(uploads);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  },
+});
+
+test('opens a pre-upgrade NIP-04 message and sends a reply readable by an independent legacy reader', async ({ page }) => {
+  const sk = new Uint8Array(32);
+  sk[31] = 1;
+  const me = { pk: archived.tags[0][1], nsec: nsecEncode(sk) };
+  const server = relay([archived]);
+  await login(page, me, { 'chat.test': server }, ['chat.test'], emptyArchive);
+  await page.getByRole('button', { name: npubEncode(archived.pubkey) }).click();
+  await expect(page.getByText('May 2024 — Merhaba 👋', { exact: true })).toBeVisible();
+  const reply = 'Still here — görüşürüz 👋';
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill(reply);
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByText(reply, { exact: true })).toBeVisible();
+
+  expect(server.writes).toHaveLength(1);
+  const sent = server.writes[0];
+  expect(sent.kind).toBe(4);
+  expect(sent.pubkey).toBe(me.pk);
+  expect(sent.tags).toContainEqual(['p', archived.pubkey]);
+  expect(verifyEvent(sent)).toBe(true);
+  const recipient = createECDH('secp256k1');
+  recipient.setPrivateKey(Buffer.from([2]));
+  const sharedKey = recipient.computeSecret(Buffer.from('02' + me.pk, 'hex'));
+  const [ciphertext, iv] = sent.content.split('?iv=');
+  const decipher = createDecipheriv('aes-256-cbc', sharedKey, Buffer.from(iv, 'base64'));
+  const plaintext = Buffer.concat([decipher.update(Buffer.from(ciphertext, 'base64')), decipher.final()]);
+  expect(plaintext.toString('utf8')).toBe(reply);
+});
+
+test('loads signed profiles, uploads an avatar when one server fails, and publishes the updated profile', async ({ page, avatarUploads }) => {
+  const me = identity(), peer = identity();
+  const profile = (user, name) => finalizeEvent({
+    kind: 0, tags: [], created_at: 100, content: JSON.stringify({ name }),
+  }, user.sk);
+  const server = relay([profile(me, 'Existing name'), profile(peer, 'Existing contact'), await dm(peer, me, 125, 'hi')]);
+  const file = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+1Zj8AAAAASUVORK5CYII=', 'base64');
+  const hash = createHash('sha256').update(file).digest('hex');
+  const picture = 'https://cdn.satellite.earth/' + hash + '.png';
+  await page.route(picture, route => route.fulfill({ contentType: 'image/png', body: file }));
+
+  await login(page, me, { 'profile.test': server }, ['profile.test'], emptyArchive);
+  await expect(page.getByRole('button', { name: 'Existing contact' })).toBeVisible();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByText('Profile', { exact: true }).click();
+  await expect(page.getByLabel('Username')).toHaveValue('Existing name');
+  await page.getByLabel('Upload Avatar').setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: file });
+  await expect(page.getByRole('img', { name: 'Profile', exact: true })).toHaveAttribute('src', picture);
+  await expect.poll(() => avatarUploads.length).toBe(2);
+  expect(avatarUploads.map(upload => upload.path).sort()).toEqual(['/blossom.primal.net/upload', '/cdn.satellite.earth/upload']);
+  for (const upload of avatarUploads) {
+    expect(upload.method).toBe('PUT');
+    expect(upload.body).toEqual(file);
+    expect(upload.headers['x-sha-256']).toBe(hash);
+    const [scheme, value] = upload.headers.authorization.split(' ');
+    expect(scheme).toBe('Nostr');
+    const authorization = JSON.parse(Buffer.from(value, 'base64url').toString());
+    expect(verifyEvent(authorization)).toBe(true);
+    expect(authorization.pubkey).toBe(me.pk);
+    expect(authorization.kind).toBe(24242);
+    expect(authorization.tags).toContainEqual(['x', hash]);
+    expect(authorization.tags).toContainEqual(['t', 'upload']);
+  }
+  await page.getByLabel('Username').fill('Updated name');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => server.writes.length).toBe(1);
+  const saved = server.writes[0];
+  expect(saved.pubkey).toBe(me.pk);
+  expect(saved.kind).toBe(0);
+  expect(verifyEvent(saved)).toBe(true);
+  expect(JSON.parse(saved.content)).toEqual({ name: 'Updated name', picture });
+});
+
+test('registration and direct chat links keep the account across reloads and respect logout', async ({ page }) => {
+  await page.routeWebSocket(/.*/, emptyArchive);
+  await page.goto('/chat');
+  await expect(page.getByRole('button', { name: 'Register', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole('button', { name: 'Register', exact: true }).click();
+  await expect(page).toHaveURL(/\/chat$/);
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/chat$/);
+  await page.reload();
+  const settings = await openSettings(page);
+  await settings.getByRole('button', { name: 'Logout' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto('/chat');
+  await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+});
