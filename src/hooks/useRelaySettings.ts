@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Event } from 'nostr-tools';
 import { dmFilters, openHistory, type RelayStates } from '../utils/history';
-import { pool } from '../utils/nostr';
+import { pool, type AuthSigner } from '../utils/nostr';
 import type useHistory from './useHistory';
 
 export interface ThreadRelayStatus {
@@ -13,7 +13,7 @@ export interface ThreadRelayStatus {
 
 export default function useRelaySettings(
   relays: string[], account: string, selected: string | null, inbox: ReturnType<typeof useHistory>,
-  onEvent: (event: Event) => void,
+  onEvent: (event: Event) => void, sign?: AuthSigner,
 ) {
   const [thread, reportThread] = useState<ThreadRelayStatus | null>(null);
   const [check, setCheck] = useState<{ peer: string; relays: string[]; urls: string[] } | null>(null);
@@ -30,9 +30,9 @@ export default function useRelaySettings(
       reportThread(last => last?.peer === check.peer && last.relays === relays
         ? { ...last, byRelay: { ...last.byRelay, ...status.byRelay } } : last);
       setCheck(null);
-    });
+    }, sign);
     return () => history.close();
-  }, [check, selected, relays, account, onEvent]);
+  }, [check, selected, relays, account, onEvent, sign]);
 
   const states: RelayStates = {};
   for (const url of relays) {

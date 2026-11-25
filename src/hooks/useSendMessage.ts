@@ -37,7 +37,7 @@ export default function useSendMessage(account: Account, peer: string, configure
     try {
       let destinations = inbox.urls;
       if (peer !== account.pk && !current?.delivered) {
-        destinations = await findInbox(peer, inbox.readRelays, configured);
+        destinations = await findInbox(peer, inbox.readRelays, configured, inbox.signAuth);
         if (!destinations.length) throw Error('No NIP-17 inbox was found for this contact. Ask them to publish their inbox relays, then retry.');
       }
       if (!current) {

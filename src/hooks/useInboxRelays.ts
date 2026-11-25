@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { compareEvents, finalizeEvent, type Event } from 'nostr-tools/pure';
-import { inboxUrls, validInbox } from '../utils/inboxRelays';
-import { pool, publishConfirmed, type AuthSigner } from '../utils/nostr';
+import { inboxUrls, validInbox, watchInbox } from '../utils/inboxRelays';
+import { publishConfirmed, type AuthSigner } from '../utils/nostr';
 import type { Account } from '../utils/privateMessages';
 
 export default function useInboxRelays(account: Account | null, configured: string[]) {
@@ -18,6 +18,8 @@ export default function useInboxRelays(account: Account | null, configured: stri
     setEvent(candidate);
     try { localStorage.setItem('dmInbox:' + account.pk, JSON.stringify(candidate)); } catch { /* Relays retain the signed list. */ }
   }, [account]);
+  const signAuth = useMemo<AuthSigner | undefined>(() => account ?
+    async template => finalizeEvent(template, account.sk) : undefined, [account]);
   const urls = useMemo(() => inboxUrls(event, configured), [event, configured]);
   const readRelays = useMemo(() => [...new Set([...configured, ...urls])], [configured, urls]);
   useEffect(() => {
@@ -26,17 +28,9 @@ export default function useInboxRelays(account: Account | null, configured: stri
       const saved = localStorage.getItem('dmInbox:' + account.pk);
       if (saved) accept(JSON.parse(saved));
     } catch { /* Ignore a malformed cached list. */ }
-    if (!readRelays.length) { setLooking(false); return; }
-    let active = true;
     setLooking(true);
-    const done = () => { if (active) setLooking(false); };
-    const sub = pool.subscribe(readRelays, { kinds: [10050], authors: [account.pk], limit: 1 }, {
-      maxWait: 5500, onevent: candidate => { if (active) accept(candidate); }, oneose: done, onclose: done,
-    });
-    return () => { active = false; sub.close(); };
-  }, [account, readRelays, accept]);
-  const signAuth = useMemo<AuthSigner | undefined>(() => account ?
-    async template => finalizeEvent(template, account.sk) : undefined, [account]);
+    return watchInbox(account.pk, readRelays, signAuth, accept, () => setLooking(false), true);
+  }, [account, readRelays, accept, signAuth]);
   async function publish(relays: string[]) {
     if (!account || !relays.length || relays.length > 16 || inFlight.current) return false;
     inFlight.current = true; setPublishing(true); setError('');

@@ -137,3 +137,16 @@ test('self messages need a single wrap and repeated identical text remains two d
   expect(a.writes).toHaveLength(2);
   expect(new Set(a.writes.map(e => unwrapEvent(e,me.sk).id)).size).toBe(2);
 });
+
+test('inbox discovery and legacy history also work on a relay that requires NIP-42 for every read', async ({ page }) => {
+  const me = identity(), peer = identity();
+  const privateRelay = relay([inboxList(me, ['members.test']), inboxList(peer, ['members.test']), await dm(peer, me, 10, 'Members-only history')]);
+  privateRelay.requireAllAuth = true;
+  await login(page, me, { 'members.test': privateRelay }, ['members.test'], archive());
+  await chat(page, peer).click();
+  await expect(page.getByText('Members-only history',{exact:true})).toBeVisible();
+  await send(page, 'Encrypted on the private relay');
+  await expect(page.getByText('Encrypted on the private relay',{exact:true})).toHaveCount(1);
+  expect(privateRelay.writes.map(event => event.kind)).toEqual([1059,1059]);
+  await expect.poll(() => [...privateRelay.live].filter(s => s.filters.some(f => f.kinds?.includes(10050) && f.authors?.includes(peer.pk))).length).toBe(0);
+});

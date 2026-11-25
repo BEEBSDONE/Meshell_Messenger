@@ -56,7 +56,7 @@ export function conversationPeer(event: Event, account: string): string | undefi
 }
 
 // An inbox relay may close its first subscription until NIP-42 authentication succeeds.
-function subscribe(relay: AbstractRelay, filters: Filter[], params: SubscriptionParams, sign?: AuthSigner) {
+export function subscribeRelay(relay: AbstractRelay, filters: Filter[], params: SubscriptionParams, sign?: AuthSigner) {
   let current: Subscription | undefined;
   let closed = false;
   let retried = false;
@@ -95,7 +95,7 @@ function readPage(relay: AbstractRelay, filter: Filter, signal: AbortSignal, rec
     };
     const abort = () => finish(new Error('History request cancelled'));
     if (signal.aborted) { reject(new Error('History request cancelled')); return; }
-    const subscription = subscribe(relay, [filter], {
+    const subscription = subscribeRelay(relay, [filter], {
       eoseTimeout: TIMEOUT * 2,
       onevent(event) {
         if (finished || ids.has(event.id)) return;
@@ -182,7 +182,7 @@ export function openHistory(
       if (signal.aborted) return;
       if (reconnect) {
         source.failed = false;
-        source.live = subscribe(relay, filters.map(f => ({ ...f, limit: 0 })), {
+        source.live = subscribeRelay(relay, filters.map(f => ({ ...f, limit: 0 })), {
           onevent: receive,
           onclose: () => {
             source.live = undefined;

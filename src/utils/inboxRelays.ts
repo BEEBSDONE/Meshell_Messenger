@@ -1,6 +1,7 @@
 import { verifyEvent, compareEvents, type Event } from 'nostr-tools/pure';
+import { subscribeRelay } from './history';
 import { normalizeRelayUrl } from './storage';
-import { pool } from './nostr';
+import { pool, type AuthSigner } from './nostr';
 
 function usableInboxRelay(value: unknown, configured: string[]): string | null {
   const url = normalizeRelayUrl(value);
@@ -30,8 +31,50 @@ export function validInbox(event: Event, pubkey: string) {
   return event.kind === 10050 && event.pubkey === pubkey && Number.isSafeInteger(event.created_at) && event.created_at >= 0 && verifyEvent(event);
 }
 
-export async function findInbox(pubkey: string, discovery: string[], configured: string[]) {
-  const events = await pool.querySync(discovery, { kinds: [10050], authors: [pubkey], limit: 1 }, { maxWait: 5500 });
-  const latest = events.filter(event => validInbox(event, pubkey)).sort(compareEvents)[0];
-  return inboxUrls(latest, configured);
+// Keep our own directory subscription live. A recipient lookup ends at EOSE
+// (or the deadline), including subscriptions reopened after an AUTH challenge.
+export function watchInbox(pubkey: string, urls: string[], sign: AuthSigner | undefined,
+  onEvent: (event: Event) => void, onReady: () => void, keepOpen: boolean) {
+  let active = true, ready = false;
+  const subscriptions = new Set<ReturnType<typeof subscribeRelay>>();
+  const finished = new Set<string>();
+  const timer = setTimeout(reportReady, 5500);
+  function close() {
+    active = false;
+    clearTimeout(timer);
+    for (const sub of subscriptions) sub.close();
+    subscriptions.clear();
+  }
+  function reportReady() {
+    if (!active || ready) return;
+    ready = true;
+    clearTimeout(timer);
+    if (!keepOpen) close();
+    onReady();
+  }
+  function finish(url: string) {
+    finished.add(url);
+    if (finished.size === urls.length) reportReady();
+  }
+  for (const url of urls) {
+    void pool.ensureRelay(url, { connectionTimeout: 5000 }).then(relay => {
+      if (!active) return;
+      const sub = subscribeRelay(relay, [{ kinds: [10050], authors: [pubkey], limit: 1 }], {
+        onevent(event) { if (active && validInbox(event, pubkey)) onEvent(event); },
+        oneose: () => finish(url), onclose: () => finish(url),
+      }, sign);
+      subscriptions.add(sub);
+    }).catch(() => finish(url));
+  }
+  if (!urls.length) reportReady();
+  return close;
+}
+
+export function findInbox(pubkey: string, discovery: string[], configured: string[], sign?: AuthSigner): Promise<string[]> {
+  return new Promise(resolve => {
+    let latest: Event | undefined;
+    watchInbox(pubkey, discovery, sign, event => {
+      if (!latest || compareEvents(event, latest) < 0) latest = event;
+    }, () => resolve(inboxUrls(latest, configured)), false);
+  });
 }

@@ -30,10 +30,10 @@ export function useRelayHistory(relays: string[], filters: Filter[], onEvent: (e
 export type RelayHistory = ReturnType<typeof useRelayHistory>;
 
 export default function useHistory(relays: string[], account: string, peer: string | undefined,
-  onEvent: (event: Event) => void, archive: PrimalHistory | null, gifts: RelayHistory, readLegacy = true) {
+  onEvent: (event: Event) => void, archive: PrimalHistory | null, gifts: RelayHistory, sign: AuthSigner | undefined, readLegacy = true) {
   const primal = usePrimalHistory(archive, peer, onEvent);
   const filters = useMemo(() => account && readLegacy ? dmFilters(account, peer) : [], [account, peer, readLegacy]);
-  const legacy = useRelayHistory(relays, filters, onEvent);
+  const legacy = useRelayHistory(relays, filters, onEvent, sign);
   const a = legacy.status, b = gifts.status;
   const status = useMemo(() => {
     const byRelay: RelayStates = { ...a.byRelay };

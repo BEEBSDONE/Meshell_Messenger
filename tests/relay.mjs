@@ -70,7 +70,7 @@ export async function login(page, user, servers, initial = Object.keys(servers),
       }
       if (command !== 'REQ') return;
       server.requests.push(rest);
-      if (server.requireReadAuth && rest.some(f => f.kinds?.includes(1059) && !f['#p']?.includes(authenticated))) {
+      if ((server.requireAllAuth && !authenticated) || server.requireReadAuth && rest.some(f => f.kinds?.includes(1059) && !f['#p']?.includes(authenticated))) {
         send(['AUTH', 'fixture-challenge']); send(['CLOSED', arg, 'auth-required: authenticate']); return;
       }
       if (server.rejectReads || server.rejectWhen?.(rest)) return send(['CLOSED', arg, 'restricted: test']);

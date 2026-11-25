@@ -65,7 +65,7 @@ export default function MessageList({ account, conversation, relays, archive, ha
       store(event, null);
     }
   }, [peer, pk, sk, store]);
-  const history = useHistory(relays, pk, peer, receive, readLegacy ? archive : null, giftHistory, readLegacy);
+  const history = useHistory(relays, pk, peer, receive, readLegacy ? archive : null, giftHistory, dmInbox.signAuth, readLegacy);
   const { byRelay } = history.status;
   const { retry } = history;
   useEffect(() => {

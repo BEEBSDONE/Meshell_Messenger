@@ -78,8 +78,8 @@ export default function ChatPage() {
   const { profiles, acceptProfile } = useProfiles(relays, peers);
   const archive = useMemo(() => pk && primalEnabled ? new PrimalHistory(pk, acceptProfile) : null, [pk, primalEnabled, acceptProfile]);
   useEffect(() => () => archive?.close(), [archive]);
-  const history = useHistory(relays, pk, undefined, receive, archive, gifts.history);
-  const relaySettings = useRelaySettings(relays, pk, selected, history, receive);
+  const history = useHistory(relays, pk, undefined, receive, archive, gifts.history, dmInbox.signAuth);
+  const relaySettings = useRelaySettings(relays, pk, selected, history, receive, dmInbox.signAuth);
   function changePrimal(enabled: boolean) {
     if (!pk) return;
     setPrimalHistoryEnabled(pk, enabled);
