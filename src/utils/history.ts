@@ -6,12 +6,16 @@ const PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 1000;
 const TIMEOUT = 10_000;
 
+export type RelaySyncState = 'checking' | 'synced' | 'failed';
+export type RelayStates = Record<string, RelaySyncState>;
+
 export interface HistoryStatus {
   loading: boolean;
   hasOlder: boolean;
-  failed: number;
+  failed: boolean;
   total: number;
   crowded: boolean;
+  byRelay: RelayStates;
 }
 
 interface Cursor {
@@ -100,10 +104,17 @@ export function openHistory(
 
   function report() {
     if (signal.aborted) return;
+    const byRelay: RelayStates = {};
+    for (const source of sources) {
+      if (source.busy) byRelay[source.url] = 'checking';
+      else if (source.failed || source.directions.some(d => d.failed)) byRelay[source.url] = 'failed';
+      else if (!source.live) byRelay[source.url] = 'checking';
+      else byRelay[source.url] = 'synced';
+    }
     onStatus({
       loading: sources.some(s => s.busy),
       hasOlder: sources.some(s => !s.failed && s.directions.some(d => !d.failed && d.cursor !== null)),
-      failed: sources.filter(s => s.failed || s.directions.some(d => d.failed)).length,
+      failed: Object.values(byRelay).includes('failed'), byRelay,
       total: sources.length, crowded,
     });
   }

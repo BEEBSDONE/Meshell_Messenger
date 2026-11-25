@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Event } from 'nostr-tools';
 import { dmFilters, openHistory, type HistoryStatus } from '../utils/history';
 import usePrimalHistory from './usePrimalHistory';
@@ -9,7 +9,7 @@ export default function useHistory(relays: string[], account: string, peer: stri
   const primal = usePrimalHistory(archive, peer, onEvent);
   const active = useRef<ReturnType<typeof openHistory> | null>(null);
   const [status, setStatus] = useState<HistoryStatus>({
-    loading: true, hasOlder: false, failed: 0, total: relays.length, crowded: false,
+    loading: true, hasOlder: false, failed: false, total: relays.length, crowded: false, byRelay: {},
   });
   useEffect(() => {
     if (!account) return;
@@ -25,5 +25,6 @@ export default function useHistory(relays: string[], account: string, peer: stri
       active.current = null;
     };
   }, [relays, account, peer, onEvent]);
-  return { status, primal, loadOlder: () => active.current?.loadOlder(), retry: () => active.current?.retry() };
+  const retry = useCallback(() => active.current?.retry(), []);
+  return { status, primal, loadOlder: () => active.current?.loadOlder(), retry };
 }

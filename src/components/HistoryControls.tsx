@@ -7,7 +7,7 @@ interface Props {
 }
 
 export default function HistoryControls({ history, items, empty }: Props) {
-  const { status, primal, loadOlder, retry } = history;
+  const { status, primal, loadOlder } = history;
   const relayPage = status.hasOlder && !status.loading;
   const archivePage = primal.state === 'more';
   const archiveOff = primal.state === 'off';
@@ -26,11 +26,6 @@ export default function HistoryControls({ history, items, empty }: Props) {
       {empty && primal.state === 'empty' && (
         <span role="status">{items === 'conversations' ? 'Primal returned no archived conversations for this account.' :
           'Primal returned no archived messages for this conversation.'}</span>
-      )}
-      {status.failed > 0 && (
-        <span role="status">
-          {status.failed} of {status.total} relays could not sync. <button onClick={retry} disabled={status.loading}>Retry</button>
-        </span>
       )}
       {primal.state === 'error' && <span role="status">Primal could not finish loading history. <button onClick={primal.next}>Retry Primal</button></span>}
       {status.crowded && <span>A relay may have more messages at the same timestamp than it will return.</span>}

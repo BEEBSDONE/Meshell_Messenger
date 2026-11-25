@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getPublicKey } from 'nostr-tools/pure';
 import type { Event as NostrEvent } from 'nostr-tools';
 import useHistory from '../hooks/useHistory';
+import useRelaySettings from '../hooks/useRelaySettings';
 import useProfiles from '../hooks/useProfiles';
 import { PrimalHistory } from '../utils/primalHistory';
 import { conversationPeer } from '../utils/history';
@@ -67,6 +68,7 @@ export default function ChatPage() {
   const archive = useMemo(() => pk && primalEnabled ? new PrimalHistory(pk, acceptProfile) : null, [pk, primalEnabled, acceptProfile]);
   useEffect(() => () => archive?.close(), [archive]);
   const history = useHistory(relays, pk, undefined, receive, archive);
+  const relaySettings = useRelaySettings(relays, pk, selected, history, receive);
   function changePrimal(enabled: boolean) {
     if (!pk) return;
     setPrimalHistoryEnabled(pk, enabled);
@@ -87,9 +89,10 @@ export default function ChatPage() {
 
   if (keyError) return <p role="alert">Your account key could not be read. Reopen MeShell to try again.</p>;
   if (!keys) return <p role="status">Opening your inbox…</p>;
-  const sidebar = <ConversationList {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays} primalEnabled={primalEnabled} onPrimalChange={changePrimal} />;
+  const sidebar = <ConversationList {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays}
+    relayStates={relaySettings.states} onRetryRelays={relaySettings.retry} primalEnabled={primalEnabled} onPrimalChange={changePrimal} />;
   const thread = current && <MessageList key={current.pubkey} conversation={current} isDarkMode={darkMode}
-    account={keys} relays={relays} archive={archive} onBack={mobile ? () => setSelected(null) : undefined} />;
+    account={keys} relays={relays} archive={archive} onRelayStatus={relaySettings.reportThread} onBack={mobile ? () => setSelected(null) : undefined} />;
   return (
     <div className={styles.chatPage}>
       {mobile ? (thread || sidebar) : <>

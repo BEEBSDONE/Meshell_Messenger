@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { Event } from 'nostr-tools';
 import * as nip04 from 'nostr-tools/nip04';
 import useHistory from '../hooks/useHistory';
+import type { ThreadRelayStatus } from '../hooks/useRelaySettings';
 import type { PrimalHistory } from '../utils/primalHistory';
 import { conversationPeer } from '../utils/history';
 import { createEvent, KIND_ENCRYPTED_DIRECT_MESSAGE, publishConfirmed } from '../utils/nostr';
@@ -16,6 +17,7 @@ interface Props {
   conversation: Conversation;
   relays: string[];
   isDarkMode: boolean;
+  onRelayStatus: (status: ThreadRelayStatus) => void;
   onBack?: () => void;
 }
 
@@ -26,7 +28,7 @@ interface Message {
   text: string | null;
 }
 
-export default function MessageList({ account, conversation, relays, archive, isDarkMode, onBack }: Props) {
+export default function MessageList({ account, conversation, relays, archive, isDarkMode, onBack, onRelayStatus }: Props) {
   const { pk, sk } = account;
   const peer = conversation.pubkey;
   const [byId, setById] = useState<Record<string, Message>>({});
@@ -59,6 +61,11 @@ export default function MessageList({ account, conversation, relays, archive, is
     }
   }, [peer, pk, sk, store]);
   const history = useHistory(relays, pk, peer, receive, archive);
+  const { byRelay } = history.status;
+  const { retry } = history;
+  useEffect(() => {
+    onRelayStatus({ peer, relays, byRelay, retry });
+  }, [peer, relays, byRelay, retry, onRelayStatus]);
   const messages = useMemo(() => Object.values(byId).sort((a, b) => a.time - b.time || a.id.localeCompare(b.id)), [byId]);
 
   useLayoutEffect(() => {

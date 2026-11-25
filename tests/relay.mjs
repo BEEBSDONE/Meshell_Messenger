@@ -15,8 +15,16 @@ export async function dm(from, to, time, text) {
 }
 
 export function relay(events = []) {
-  return { events, cap: Infinity, rejectReads: false, rejectWrites: false, silent: false, requests: [], writes: [], live: new Set(), sockets: new Set() };
+  return { events, cap: Infinity, rejectReads: false, rejectWhen: undefined, rejectWrites: false, silent: false, requests: [], writes: [], live: new Set(), sockets: new Set() };
 }
+
+export async function openSettings(page) {
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  return page.getByRole('dialog', { name: 'Settings' });
+}
+
+export const dot = (dialog, url) => dialog.getByRole('listitem').filter({ has: dialog.page().getByText(url, { exact: true }) }).getByRole('img');
 
 // Every WebSocket is intercepted locally. Fixtures still pass through the
 // production signature verification, recipient filters and NIP-04 decryption.
@@ -48,7 +56,7 @@ export async function login(page, user, servers, initial = Object.keys(servers),
       }
       if (command !== 'REQ') return;
       server.requests.push(rest);
-      if (server.rejectReads) return send(['CLOSED', arg, 'restricted: test']);
+      if (server.rejectReads || server.rejectWhen?.(rest)) return send(['CLOSED', arg, 'restricted: test']);
       const entry = { filters: rest, deliver: event => send(['EVENT', arg, event]) };
       subs.set(arg, entry);
       server.live.add(entry);
