@@ -235,3 +235,13 @@ input:not(:checked) + .slider .sunIcon {
   color: var(--primary-color-light);
 }
 
+.primalHistory {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color-light);
+  color: var(--text-color-light);
+}
+.primalHistory button { cursor: pointer; }
+.primalHistory small { line-height: 1.4; }

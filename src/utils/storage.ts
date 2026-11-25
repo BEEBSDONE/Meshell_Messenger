@@ -48,6 +48,16 @@ export function getRelays(): string[] {
   return [...defaultRelays];
 }
 
+// Only the user's choice is persistent. Archived messages stay in memory.
+export function primalHistoryEnabled(pubkey: string): boolean {
+  return localStorage.getItem('primalHistory:' + pubkey) === 'enabled';
+}
+
+export function setPrimalHistoryEnabled(pubkey: string, enabled: boolean) {
+  if (enabled) localStorage.setItem('primalHistory:' + pubkey, 'enabled');
+  else localStorage.removeItem('primalHistory:' + pubkey);
+}
+
 export const removeRelays = (): void => {
   localStorage.removeItem('relays');
 };

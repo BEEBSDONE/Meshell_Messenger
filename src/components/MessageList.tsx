@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { Event } from 'nostr-tools';
 import * as nip04 from 'nostr-tools/nip04';
 import useHistory from '../hooks/useHistory';
+import type { PrimalHistory } from '../utils/primalHistory';
 import { conversationPeer } from '../utils/history';
 import { createEvent, KIND_ENCRYPTED_DIRECT_MESSAGE, publishConfirmed } from '../utils/nostr';
 import type { Conversation } from './ChatPage';
@@ -10,6 +11,7 @@ import ProfilePicture from './ProfilePicture';
 import styles from './MessageList.module.css';
 
 interface Props {
+  archive: PrimalHistory | null;
   account: { sk: Uint8Array; pk: string };
   conversation: Conversation;
   relays: string[];
@@ -24,7 +26,7 @@ interface Message {
   text: string | null;
 }
 
-export default function MessageList({ account, conversation, relays, isDarkMode, onBack }: Props) {
+export default function MessageList({ account, conversation, relays, archive, isDarkMode, onBack }: Props) {
   const { pk, sk } = account;
   const peer = conversation.pubkey;
   const [byId, setById] = useState<Record<string, Message>>({});
@@ -46,15 +48,17 @@ export default function MessageList({ account, conversation, relays, isDarkMode,
     const message = { id: event.id, sent: event.pubkey === pk, time: event.created_at, text };
     setById(prev => prev[event.id] ? prev : { ...prev, [event.id]: message });
   }, [pk]);
+  const decryptedIds = useRef(new Set<string>());
   const receive = useCallback(async (event: Event) => {
-    if (conversationPeer(event, pk) !== peer) return;
+    if (conversationPeer(event, pk) !== peer || decryptedIds.current.has(event.id)) return;
+    decryptedIds.current.add(event.id);
     try {
       store(event, await nip04.decrypt(sk, peer, event.content));
     } catch {
       store(event, null);
     }
   }, [peer, pk, sk, store]);
-  const history = useHistory(relays, pk, peer, receive);
+  const history = useHistory(relays, pk, peer, receive, archive);
   const messages = useMemo(() => Object.values(byId).sort((a, b) => a.time - b.time || a.id.localeCompare(b.id)), [byId]);
 
   useLayoutEffect(() => {
