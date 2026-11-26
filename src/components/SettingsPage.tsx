@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { normalizeRelayUrl } from '../utils/storage';
 import { logout as forgetAccount, lockNow } from '../utils/session';
+import PushSettings from './PushSettings';
+import type { Account } from '../utils/privateMessages';
 import MessageInboxSettings from './MessageInboxSettings';
 import type { RelayHistory } from '../hooks/useHistory';
 import type { InboxRelays } from '../hooks/useDefaultInbox';
@@ -11,6 +13,8 @@ import type { CacheStatus } from '../utils/messageCache';
 const syncLabels: Record<RelaySyncState, string> = { synced: 'Synced', failed: 'Not synced', checking: 'Checking' };
 
 interface SettingsPageProps {
+  account: Account;
+  vaultId: string;
   cacheStatus: CacheStatus;
   onCacheChange: (enabled: boolean) => void;
   dmInbox: InboxRelays;
@@ -25,7 +29,7 @@ interface SettingsPageProps {
   setShowSettings: (show: boolean) => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ cacheStatus, onCacheChange, dmInbox, giftHistory, onCopyNsec, setShowSettings, relayList, relayStates, onRetryRelays, onChange, primalEnabled, onPrimalChange }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ account, vaultId, cacheStatus, onCacheChange, dmInbox, giftHistory, onCopyNsec, setShowSettings, relayList, relayStates, onRetryRelays, onChange, primalEnabled, onPrimalChange }) => {
   const [relayInput, setRelayInput] = useState('');
   const confirmation = useRef<HTMLDialogElement>(null);
   const [notice, setNotice] = useState('');
@@ -110,6 +114,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ cacheStatus, onCacheChange,
         </label>
         <small>Open saved chats with your PIN. Turning this off deletes their cached copies from this device.</small>
         {cacheStatus.error && <small role="status">{cacheStatus.error}</small>}
+        <PushSettings account={account} vaultId={vaultId} />
         <button className={styles.close} onClick={lockNow}>Lock now</button>
         <button className={styles.logout} onClick={() => { setNotice(''); confirmation.current?.showModal(); }}>
           Logout
