@@ -14,6 +14,7 @@ import { MessageCache, initialCacheStatus } from '../utils/messageCache';
 import { conversationPeer } from '../utils/history';
 import { encodeNpub, pool } from '../utils/nostr';
 import { getRelays, getDarkMode, setRelays, primalHistoryEnabled, setPrimalHistoryEnabled } from '../utils/storage';
+import { reconcilePush } from '../utils/push';
 import ConversationList from './ConversationList';
 import MessageList from './MessageList';
 import styles from './ChatPage.module.css';
@@ -32,6 +33,12 @@ export default function ChatPage({ keys, vaultId, justRegistered }: { keys: Acco
   const [selected, setSelected] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(getDarkMode);
   const [mobile, setMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const check = () => { void reconcilePush(keys, vaultId).catch(() => {}); };
+    check(); window.addEventListener('online', check);
+    return () => window.removeEventListener('online', check);
+  }, [keys, vaultId]);
 
   useEffect(() => () => pool.destroy(), [relays]);
   useEffect(() => {
@@ -108,7 +115,7 @@ export default function ChatPage({ keys, vaultId, justRegistered }: { keys: Acco
     setRelayState(next);
   }
 
-  const sidebar = <ConversationList account={keys} cacheStatus={cacheStatus} onCacheChange={enabled => cache.setEnabled(enabled)} dmInbox={dmInbox} giftHistory={gifts.history} {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays}
+  const sidebar = <ConversationList vaultId={vaultId} account={keys} cacheStatus={cacheStatus} onCacheChange={enabled => cache.setEnabled(enabled)} dmInbox={dmInbox} giftHistory={gifts.history} {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays}
     onCopyNsec={() => navigator.clipboard.writeText(nsecEncode(keys.sk))}
     relayStates={relaySettings.states} onRetryRelays={retryRelays} primalEnabled={primalEnabled} onPrimalChange={changePrimal} />;
   const thread = current && <MessageList key={current.pubkey} conversation={current} isDarkMode={darkMode}

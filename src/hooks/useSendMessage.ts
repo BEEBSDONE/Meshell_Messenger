@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { findInbox } from '../utils/inboxRelays';
 import { pendingMessage, reserveMessage, updatePending } from '../utils/messageOutbox';
 import { openPrivateMessage, prepareMessage, type Account, type PrivateDraft } from '../utils/privateMessages';
+import { notifyRecipient } from '../utils/push';
 import { publishConfirmed } from '../utils/nostr';
 import type { Event } from 'nostr-tools/pure';
 import type { InboxRelays } from './useDefaultInbox';
@@ -64,6 +65,7 @@ export default function useSendMessage(account: Account, peer: string, configure
         await publishConfirmed(destinations, current.toPeer, signAuth).catch(() => {
           throw Error('No relay confirmed this message. Your draft is ready to retry.');
         });
+        if (peer !== account.pk) notifyRecipient(current.toPeer);
         current = { ...current, delivered: true };
         if (active.current) setDraft(current);
         await updatePending(account.pk, current, 'delivered');

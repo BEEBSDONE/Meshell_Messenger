@@ -18,6 +18,7 @@ import type { CacheStatus } from '../utils/messageCache';
 const ProfileModal = lazy(() => import('./ProfileModal'));
 
 interface ConversationListProps {
+  vaultId: string;
   cacheStatus: CacheStatus;
   onCacheChange: (enabled: boolean) => void;
   account: Account;
@@ -38,7 +39,7 @@ interface ConversationListProps {
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  cacheStatus, onCacheChange, account, conversations, dmInbox, giftHistory, onSelect, onCopyNsec, darkMode, setDarkMode, history, relays, relayStates, onRetryRelays, onRelaysChange, primalEnabled, onPrimalChange,
+  vaultId, cacheStatus, onCacheChange, account, conversations, dmInbox, giftHistory, onSelect, onCopyNsec, darkMode, setDarkMode, history, relays, relayStates, onRetryRelays, onRelaysChange, primalEnabled, onPrimalChange,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
@@ -110,7 +111,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
         />
       )}
 
-      {showSettings && <SettingsPage cacheStatus={cacheStatus} onCacheChange={onCacheChange} dmInbox={dmInbox} giftHistory={giftHistory} onCopyNsec={onCopyNsec} setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
+      {showSettings && <SettingsPage account={account} vaultId={vaultId} cacheStatus={cacheStatus} onCacheChange={onCacheChange} dmInbox={dmInbox} giftHistory={giftHistory} onCopyNsec={onCopyNsec} setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
         relayStates={relayStates} onRetryRelays={onRetryRelays} primalEnabled={primalEnabled} onPrimalChange={onPrimalChange} />}
       {showProfileModal && <Suspense fallback={<p role="status">Opening profile…</p>}><ProfileModal account={account} setShowProfileModal={setShowProfileModal} darkMode={darkMode} /></Suspense>}
     </div>

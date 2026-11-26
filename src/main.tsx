@@ -4,8 +4,11 @@ import './global.css';
 import { registerSW } from 'virtual:pwa-register';
 
 import { startSession } from './utils/session';
+import { flushRevocations } from './utils/push';
 
 startSession();
+void flushRevocations();
+window.addEventListener('online', flushRevocations);
 
 // Register the service worker
 registerSW({

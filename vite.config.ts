@@ -12,6 +12,7 @@ export default defineConfig(({ command }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: { importScripts: ['/push-worker.js'], navigateFallbackDenylist: [/^\/api\/push\//] },
       devOptions: {
         enabled: true,
       },

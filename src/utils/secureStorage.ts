@@ -1,8 +1,18 @@
-import { openDB } from 'idb';
+import { openDB, type IDBPTransaction } from 'idb';
 import { getPublicKey } from 'nostr-tools/pure';
 import { decode } from 'nostr-tools/nip19';
 
 export const STORE = 'nsecStore';
+export const PUSH_DEVICE = 'push-device';
+export interface PushDevice {
+  account: string; vaultId: string; token: string; device: string; endpoint: string; active: boolean;
+}
+export async function retirePush(tx: IDBPTransaction<unknown, [typeof STORE], 'readwrite'>, token?: string) {
+  const device: PushDevice | undefined = await tx.store.get(PUSH_DEVICE);
+  if (!device || (token && device.token !== token)) return;
+  await tx.store.put({ account: device.account, token: device.token, endpoint: device.endpoint }, ['push-revoke', device.token]);
+  await tx.store.delete(PUSH_DEVICE);
+}
 export interface Vault { version: 1; id: string; pk: string; encrypted: string }
 export interface StoredKeys { vault?: Vault; legacy?: string; aliases: (string | null)[] }
 const aliasNames = ['nsec', 'privateKey'];
@@ -59,6 +69,7 @@ export async function commitKeys(before: StoredKeys, next: Vault | undefined, si
         aliases().some((value, i) => value !== before.aliases[i])) throw Error('The saved account changed. Reopen MeShell and try again.');
       if (next) await tx.store.put(next, 'vault');
       else if (vault) {
+        await retirePush(tx);
         await tx.store.delete('vault');
         await tx.store.delete(['history', vault.id]);
         await tx.store.delete(historyRange(vault.id));
