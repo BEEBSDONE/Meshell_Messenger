@@ -1,96 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import DOMPurify from 'dompurify'; // Import DOMPurify
-import { storeNsec, getDarkMode } from '../utils/storage'; // Added getDarkMode for dark mode persistence
-import { decodeNsec } from '../utils/nostr';
-import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
-import * as nip19 from 'nostr-tools/nip19'; // Import nip19 for encoding
+import { useState } from 'react';
+import { beginSetup } from '../utils/session';
+import { getDarkMode } from '../utils/storage';
 import styles from './LoginPage.module.css';
-import MeShellLogo from '../assets/MeShell_Logo.svg'; // Import the logo
+import logo from '../assets/MeShell_Logo.svg';
 
-const LoginPage: React.FC<{ onRegister: (pubkey: string) => void }> = ({ onRegister }) => {
-  const [nsecInput, setNsecInput] = useState('');
-  const [darkMode, setDarkMode] = useState(false); // Dark mode state
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const savedDarkMode = getDarkMode();
-    if (savedDarkMode !== null) {
-      setDarkMode(savedDarkMode); // Initialize dark mode based on saved preference
-    }
-  }, []);
-
-  const handleLogin = async () => {
-    const sanitizedNsec = DOMPurify.sanitize(nsecInput.trim()); // Sanitize nsec input
-    if (!sanitizedNsec) {
-      alert('Please enter your nsec.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      decodeNsec(sanitizedNsec); // Verify nsec is valid
-      await storeNsec(sanitizedNsec); // Wait for nsec to be stored in IndexedDB
-      navigate('/chat', { replace: true });
-    } catch {
-      alert('Invalid nsec. Please enter a valid nsec.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    setIsLoading(true);
-    try {
-      const sk = generateSecretKey(); // Generate a new secret key
-      const nsec = nip19.nsecEncode(sk); // Encode it as nsec
-      await storeNsec(nsec); // Wait for nsec to be stored in IndexedDB
-      onRegister(getPublicKey(sk));
-      navigate('/chat', { replace: true }); // Redirect to chat page
-    } catch (error) {
-      console.error('Error during registration:', error);
-      alert('Error during registration. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className={`${styles.loginPage} ${darkMode ? 'darkMode' : ''}`}>
-      {/* Logo */}
-      <img src={MeShellLogo} alt="MeShell Logo" className={styles.logo} />
-
-      <div className={styles.loginBox}>
-        <h2>Login</h2>
-        <input
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={nsecInput}
-          onChange={(e) => setNsecInput(e.target.value)}
-          placeholder="Enter your nsec"
-          className={styles.input}
-          disabled={isLoading}
-        />
-        <button 
-          onClick={handleLogin} 
-          className={styles.loginButton}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Logging in...' : 'Login'}
-        </button>
-        <button 
-          onClick={handleRegister} 
-          className={styles.registerButton}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Registering...' : 'Register'}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default LoginPage;
-
+export default function LoginPage() {
+  const [nsec, setNsec] = useState('');
+  const [error, setError] = useState('');
+  function login() {
+    try { beginSetup(nsec); }
+    catch { setError('Enter a valid nsec to sign in.'); }
+  }
+  return <main className={styles.loginPage + (getDarkMode() ? ' darkMode' : '')}>
+    <img src={logo} alt="MeShell" className={styles.logo} />
+    <form className={styles.loginBox} onSubmit={e => { e.preventDefault(); login(); }}>
+      <h2>Login</h2>
+      <input type="password" aria-label="Private key" autoComplete="off" spellCheck={false} className={styles.input}
+        value={nsec} onChange={e => setNsec(e.target.value)} placeholder="Enter your nsec" />
+      {error && <p role="alert">{error}</p>}
+      <button className={styles.loginButton}>Login</button>
+      <button type="button" className={styles.registerButton} onClick={() => beginSetup()}>Register</button>
+    </form>
+  </main>;
+}

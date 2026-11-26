@@ -16,13 +16,6 @@ export const KIND_ENCRYPTED_DIRECT_MESSAGE = 4; // Encrypted direct message (NIP
 // Initialize SimplePool
 export const pool = new SimplePool();
 
-// Function to decode nsec (private key) using NIP-19
-export const decodeNsec = (nsec: string): Uint8Array => {
-  const { type, data } = nip19.decode(nsec);
-  if (type !== 'nsec' || data.length !== 32) throw new Error('Invalid nsec');
-  return data;
-};
-
 // Function to encode npub (public key) using NIP-19
 export const encodeNpub = (pubkey: string): string => {
   return nip19.npubEncode(pubkey);

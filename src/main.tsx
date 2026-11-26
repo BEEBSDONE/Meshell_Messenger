@@ -3,6 +3,10 @@ import App from './App';
 import './global.css';
 import { registerSW } from 'virtual:pwa-register';
 
+import { startSession } from './utils/session';
+
+startSession();
+
 // Register the service worker
 registerSW({
   onNeedRefresh() {

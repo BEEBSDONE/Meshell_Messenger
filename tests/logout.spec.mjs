@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { identity, login, openSettings } from './relay.mjs';
+import { identity, login, openSettings, setupPin, unlock } from './relay.mjs';
 
 test('logout can be dismissed, clipboard failure is recoverable, and the copied key signs back in', async ({ page }) => {
   const me = identity();
@@ -40,6 +40,7 @@ test('logout can be dismissed, clipboard failure is recoverable, and the copied 
   await page.reload();
   await page.getByPlaceholder('Enter your nsec').fill(saved);
   await page.getByRole('button', {name:'Login',exact:true}).click();
+  await setupPin(page);
   await expect(page).toHaveURL(/\/chat$/);
 });
 
@@ -53,6 +54,7 @@ test('confirming logout also removes access in an already-open chat tab', async 
   const second = await context.newPage();
   await second.routeWebSocket(/.*/, empty);
   await second.goto('/chat');
+  await unlock(second);
   await expect(second.getByRole('button', { name: 'Menu' })).toBeVisible();
   const settings = await openSettings(page);
   await settings.getByRole('button', { name: 'Logout' }).click();

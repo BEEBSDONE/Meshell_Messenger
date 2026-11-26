@@ -1,31 +1,3 @@
-import { decodeNsec } from './nostr';  // Make sure to import the necessary utility
-import { getPublicKey } from 'nostr-tools/pure';  // Ensure you're using nostr-tools
-import { storeEncryptedNsec, getEncryptedNsec, clearNsec } from './secureStorage';
-
-export const ACCOUNT_CHANGE = 'meshell:account-change';
-function notifyAccountChange() {
-  try { localStorage.setItem(ACCOUNT_CHANGE, crypto.randomUUID()); } catch { /* IndexedDB is authoritative. */ }
-}
-
-export const storeNsec = async (nsec: string): Promise<void> => {
-  await storeEncryptedNsec(nsec);
-  notifyAccountChange();
-};
-
-export const getNsec = async (): Promise<string | null> => {
-  return await getEncryptedNsec();
-};
-
-// Function to get hex-encoded private key from local storage
-export const getPrivateKey = (): string | null => {
-  return localStorage.getItem('privateKey'); // This assumes you store the private key as 'privateKey' in hex format
-};
-
-export const removeNsec = async (): Promise<void> => {
-  await clearNsec();
-  notifyAccountChange();
-};
-
 const defaultRelays = [
   'wss://relay.damus.io', 'wss://nostr-pub.wellorder.net',
   'wss://relay.nostr.band', 'wss://relay.snort.social', 'wss://relay.primal.net',
@@ -55,7 +27,7 @@ export function getRelays(): string[] {
   return [...defaultRelays];
 }
 
-// Only the user's choice is persistent. Archived messages stay in memory.
+// The Primal lookup preference is independent of the opt-in device history.
 export function primalHistoryEnabled(pubkey: string): boolean {
   const saved = localStorage.getItem('primalHistory:' + pubkey);
   return saved === null || saved === 'enabled';
@@ -69,10 +41,6 @@ export const removeRelays = (): void => {
   localStorage.removeItem('relays');
 };
 
-export const removePrivateKey = (): void => {
-  localStorage.removeItem('privateKey');
-};
-
 export const removeDarkMode = (): void => {
   localStorage.removeItem('darkMode');
 };
@@ -83,8 +51,7 @@ export const setRelays = (relays: string[]): void => {
 
 // Dark Mode Persistence
 export const getDarkMode = (): boolean => {
-  const darkMode = localStorage.getItem('darkMode');
-  return darkMode ? JSON.parse(darkMode) : false; // Default to false
+  try { return localStorage.getItem('darkMode') === 'true'; } catch { return false; }
 };
 
 export const setDarkMode = (isDarkMode: boolean): void => {
@@ -111,21 +78,3 @@ export const storeProfilePicture = (profilePictureUrl: string): void => {
 export const getProfilePicture = (): string | null => {
   return localStorage.getItem('profilePicture');
 };
-
-// Function to retrieve the public key from the stored nsec
-export const getPublicKeyFromNsec = async (): Promise<string | null> => {
-  const nsec = await getNsec();
-  if (!nsec) {
-    return null;
-  }
-
-  try {
-    const privateKey = decodeNsec(nsec);
-    const publicKey = getPublicKey(privateKey);
-    return publicKey;
-  } catch (error) {
-    console.error('Error decoding nsec or getting public key:', error);
-    return null;
-  }
-};
-

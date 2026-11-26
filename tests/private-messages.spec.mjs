@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createRumor, createSeal, createWrap, unwrapEvent } from 'nostr-tools/nip59';
 import { verifyEvent } from 'nostr-tools/pure';
-import { dm, identity, inboxList, login, newChat, openSettings, relay } from './relay.mjs';
+import { dm, identity, inboxList, login, newChat, openSettings, relay, reopen } from './relay.mjs';
 
 const chat = (page, peer) => page.getByRole('button', { name: peer.npub, exact: true });
 const input = page => page.getByRole('textbox', { name: 'Message', exact: true });
@@ -33,7 +33,7 @@ test('two accounts exchange NIP-17 through separate authenticated inbox relays a
     await send(other, 'Reply from Bob');
     await expect(page.getByText('Reply from Bob', { exact: true })).toBeVisible();
     for (const [p, peer] of [[page, bob], [other, alice]]) {
-      await p.reload(); await chat(p, peer).click();
+      await reopen(p); await chat(p, peer).click();
       await expect(p.getByText('Reply from Bob', { exact: true })).toHaveCount(1);
       await expect(p.getByText('Hello from Alice 👋', { exact: true })).toHaveCount(1);
     }
@@ -68,7 +68,7 @@ test('an account chooses its public inbox and an unpublished contact keeps the n
   await expect(page.getByRole('alert')).toContainText('No NIP-17 inbox');
   await expect(input(page)).toHaveValue('Do not downgrade');
   expect([...a.writes,...b.writes].every(e => e.kind === 10050)).toBe(true);
-  await page.reload();
+  await reopen(page);
   const reopened = await openSettings(page);
   await expect(reopened.getByRole('button', { name: 'Change inbox relays' })).toBeVisible();
   await expect(reopened.getByRole('region', { name: 'Message inbox' }).getByText('wss://two.test')).toHaveCount(0);
@@ -83,7 +83,7 @@ test('a delivered message survives a failed sender copy and reload without repub
   await newChat(page, peer); await send(page, 'Save my sent copy');
   await expect(page.getByRole('alert')).toContainText('relay accepted the message');
   expect(b.writes).toHaveLength(1);
-  await page.reload(); await chat(page, peer).click();
+  await reopen(page); await chat(page, peer).click();
   await expect(input(page)).toHaveValue('Save my sent copy');
   a.rejectWrites = false;
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
@@ -115,7 +115,7 @@ test('validates seals, author, room membership and rumor ID, deduplicates rewrap
   const newest = wrap(peer, me, rumor(peer, me, 'Newest private text', 200));
   const more = [older, newest, ...data].sort((a,b)=> b.created_at-a.created_at);
   good.events = more; good.cap = 2;
-  await page.reload(); await chat(page, peer).click();
+  await reopen(page); await chat(page, peer).click();
   for (let step=0; step<8 && !(await page.getByText('Older private text',{exact:true}).count() && await page.getByText('Newest private text',{exact:true}).count()); step++) {
     await page.getByRole('region',{name:'Messages',exact:true}).getByRole('button',{name:'Load older messages'}).click();
     await expect(page.getByText('Loading messages…',{exact:true})).toHaveCount(0);

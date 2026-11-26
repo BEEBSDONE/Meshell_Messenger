@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { finalizeEvent, verifyEvent } from 'nostr-tools/pure';
 import { unwrapEvent } from 'nostr-tools/nip59';
-import { dm, dot, identity, inboxList, login as signIn, openSettings, relay } from './relay.mjs';
+import { dm, dot, identity, inboxList, login as signIn, openSettings, relay, reopen } from './relay.mjs';
 
 const contact = (page, who) => page.getByRole('button', { name: who.npub, exact: true });
 const thread = page => page.getByRole('region', { name: 'Messages', exact: true });
@@ -25,7 +25,7 @@ test('incoming and sent-only contacts survive missing or malformed profiles, dup
     'a.test': relay([latest, sentOnly, malformed, corrupt, wrongSignature]), 'b.test': relay([latest, incoming]),
   });
   for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt) await page.reload();
+    if (attempt) await reopen(page);
     await expect(inbox(page).getByRole('button').first()).toHaveText(alice.npub);
     await contact(page, alice).click();
     await expect(thread(page).getByText('from Alice', { exact: true })).toHaveCount(1);

@@ -1,71 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import DOMPurify from 'dompurify'; // Import DOMPurify
 import styles from './ProfileModal.module.css';
-import { decodeNsec, encodeNpub, createEvent, pool, publishConfirmed } from '../utils/nostr';
-import { getNsec, getRelays } from '../utils/storage';
-import { getPublicKey } from 'nostr-tools/pure';
+import { encodeNpub, createEvent, pool, publishConfirmed } from '../utils/nostr';
+import { getRelays } from '../utils/storage';
+import { nsecEncode } from 'nostr-tools/nip19';
+import type { Account } from '../utils/privateMessages';
 import ProfilePicture from './ProfilePicture';
 import type { EventTemplate } from 'nostr-tools/pure';
 import type { SubCloser } from 'nostr-tools/pool';
 import { BlossomUploader } from '@nostrify/nostrify/uploaders';
 
 interface ProfileModalProps {
+  account: Account;
   setShowProfileModal: (show: boolean) => void;
   darkMode: boolean;
 }
 
-const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMode }) => {
+const ProfileModal: React.FC<ProfileModalProps> = ({ account, setShowProfileModal, darkMode }) => {
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
-  const [npub, setNpub] = useState<string>('');
-  const [nsec, setNsec] = useState<string | null>(null);
+  const { pk: pubkey, sk } = account;
+  const npub = encodeNpub(pubkey);
   const [nickname, setNickname] = useState<string>('');
 
   useEffect(() => {
     let active = true;
     let metadata: SubCloser | undefined;
-    getNsec().then(storedNsec => {
-      if (!active || !storedNsec) return;
-      const pubkey = getPublicKey(decodeNsec(storedNsec));
-      setNsec(storedNsec);
-      setNpub(encodeNpub(pubkey));
-      const relays = getRelays();
-      if (!relays.length) return;
-      let newest: { time: number; id: string } | undefined;
-      metadata = pool.subscribeEose(relays, { authors: [pubkey], kinds: [0] }, {
-        maxWait: 8_000,
-        onclose: () => { metadata = undefined; },
-        onevent(event) {
-          if (!active || (newest && (newest.time > event.created_at ||
-            (newest.time === event.created_at && newest.id <= event.id)))) return;
-          try {
-            const content = JSON.parse(event.content);
-            if (!content || typeof content !== 'object' || Array.isArray(content)) return;
-            newest = { time: event.created_at, id: event.id };
-            setNickname(typeof content.name === 'string' ? content.name : '');
-            setProfilePicture(typeof content.picture === 'string' && /^https:\/\//i.test(content.picture) ? content.picture : null);
-          } catch { /* Keep the last readable profile. */ }
-        },
-      });
-    }).catch(() => { if (active) console.error('Could not open the profile.'); });
+    const relays = getRelays();
+    if (!relays.length) return;
+    let newest: { time: number; id: string } | undefined;
+    metadata = pool.subscribeEose(relays, { authors: [pubkey], kinds: [0] }, {
+      maxWait: 8_000,
+      onclose: () => { metadata = undefined; },
+      onevent(event) {
+        if (!active || (newest && (newest.time > event.created_at ||
+          (newest.time === event.created_at && newest.id <= event.id)))) return;
+        try {
+          const content = JSON.parse(event.content);
+          if (!content || typeof content !== 'object' || Array.isArray(content)) return;
+          newest = { time: event.created_at, id: event.id };
+          setNickname(typeof content.name === 'string' ? content.name : '');
+          setProfilePicture(typeof content.picture === 'string' && /^https:\/\//i.test(content.picture) ? content.picture : null);
+        } catch { /* Keep the last readable profile. */ }
+      },
+    });
     return () => {
       active = false;
       metadata?.close();
     };
-  }, []);
+  }, [pubkey]);
 
   const handleProfilePictureChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files && event.target.files[0];
     if (file) {
       try {
-        const storedNsec = await getNsec();
-        if (!storedNsec) {
-          console.error('No private key found.');
-          return;
-        }
-
-        const sk = decodeNsec(storedNsec);
-        const pubkey = getPublicKey(sk);
-
         const signer = {
           signEvent: async (event: EventTemplate) => {
             return createEvent(sk, event);
@@ -99,30 +86,26 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
   };
 
   const handleSave = async () => {
-    const storedNsec = await getNsec();
-    if (storedNsec) {
+    try {
+      const relays = getRelays();
+      const eventTemplate = {
+        kind: 0,
+        content: JSON.stringify({
+          name: DOMPurify.sanitize(nickname),
+          picture: profilePicture,
+        }),
+        tags: [],
+        created_at: Math.floor(Date.now() / 1000),
+      };
+      const event = createEvent(sk, eventTemplate);
       try {
-        const relays = getRelays();
-        const sk = decodeNsec(storedNsec);
-        const eventTemplate = {
-          kind: 0,
-          content: JSON.stringify({
-            name: DOMPurify.sanitize(nickname),
-            picture: profilePicture,
-          }),
-          tags: [],
-          created_at: Math.floor(Date.now() / 1000),
-        };
-        const event = createEvent(sk, eventTemplate);
-        try {
-          await publishConfirmed(relays, event);
-          setShowProfileModal(false);
-        } catch (error) {
-          console.error('Error sending metadata update:', error);
-        }
+        await publishConfirmed(relays, event);
+        setShowProfileModal(false);
       } catch (error) {
-        console.error('Error updating profile:', error);
+        console.error('Error sending metadata update:', error);
       }
+    } catch (error) {
+      console.error('Error updating profile:', error);
     }
   };
 
@@ -170,7 +153,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ setShowProfileModal, darkMo
         {/* Nsec Section */}
         <div className={styles.nsecSection}>
           <input type="text" id="nsec" value="Private key, click to copy!" readOnly className={styles.input} />
-          <button onClick={() => navigator.clipboard.writeText(nsec || '')} className={styles.copyButton}>
+          <button onClick={() => navigator.clipboard.writeText(nsecEncode(sk))} className={styles.copyButton}>
             Copy
           </button>
         </div>

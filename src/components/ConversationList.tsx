@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import styles from './ConversationList.module.css';
 import ProfilePicture from './ProfilePicture';
 import NewConversationModal from './NewConversationModal';
 import SettingsPage from './SettingsPage';
-import ProfileModal from './ProfileModal';
 import { setDarkMode as storeDarkMode } from '../utils/storage';
 import MeshellLogo from '../assets/MeShell_Logo.svg';
 
@@ -13,8 +12,15 @@ import type useHistory from '../hooks/useHistory';
 import type { RelayHistory } from '../hooks/useHistory';
 import type { RelayStates } from '../utils/history';
 import HistoryControls from './HistoryControls';
+import type { Account } from '../utils/privateMessages';
+import type { CacheStatus } from '../utils/messageCache';
+
+const ProfileModal = lazy(() => import('./ProfileModal'));
 
 interface ConversationListProps {
+  cacheStatus: CacheStatus;
+  onCacheChange: (enabled: boolean) => void;
+  account: Account;
   conversations: Conversation[];
   dmInbox: InboxRelays;
   giftHistory: RelayHistory;
@@ -32,7 +38,7 @@ interface ConversationListProps {
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  conversations, dmInbox, giftHistory, onSelect, onCopyNsec, darkMode, setDarkMode, history, relays, relayStates, onRetryRelays, onRelaysChange, primalEnabled, onPrimalChange,
+  cacheStatus, onCacheChange, account, conversations, dmInbox, giftHistory, onSelect, onCopyNsec, darkMode, setDarkMode, history, relays, relayStates, onRetryRelays, onRelaysChange, primalEnabled, onPrimalChange,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
@@ -104,9 +110,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
         />
       )}
 
-      {showSettings && <SettingsPage dmInbox={dmInbox} giftHistory={giftHistory} onCopyNsec={onCopyNsec} setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
+      {showSettings && <SettingsPage cacheStatus={cacheStatus} onCacheChange={onCacheChange} dmInbox={dmInbox} giftHistory={giftHistory} onCopyNsec={onCopyNsec} setShowSettings={setShowSettings} relayList={relays} onChange={onRelaysChange}
         relayStates={relayStates} onRetryRelays={onRetryRelays} primalEnabled={primalEnabled} onPrimalChange={onPrimalChange} />}
-      {showProfileModal && <ProfileModal setShowProfileModal={setShowProfileModal} darkMode={darkMode} />}
+      {showProfileModal && <Suspense fallback={<p role="status">Opening profile…</p>}><ProfileModal account={account} setShowProfileModal={setShowProfileModal} darkMode={darkMode} /></Suspense>}
     </div>
   );
 };
