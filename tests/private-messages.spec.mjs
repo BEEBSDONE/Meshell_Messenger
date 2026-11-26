@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createRumor, createSeal, createWrap, unwrapEvent } from 'nostr-tools/nip59';
 import { verifyEvent } from 'nostr-tools/pure';
-import { dm, identity, inboxList, login, openSettings, relay } from './relay.mjs';
+import { dm, identity, inboxList, login, newChat, openSettings, relay } from './relay.mjs';
 
 const chat = (page, peer) => page.getByRole('button', { name: peer.npub, exact: true });
 const input = page => page.getByRole('textbox', { name: 'Message', exact: true });
@@ -12,11 +12,6 @@ const archive = (calls = []) => ws => ws.onMessage(raw => {
 });
 function wrap(from, to, rumor) { return createWrap(createSeal(rumor, from.sk, to.pk), to.pk); }
 const rumor = (from, to, text, time = 123) => createRumor({ kind: 14, content: text, tags: [['p', to.pk]], created_at: time }, from.sk);
-async function newChat(page, peer) {
-  await page.getByRole('button', { name: '+', exact: true }).click();
-  await page.getByPlaceholder("Enter recipient's npub").fill(peer.npub);
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
-}
 async function send(page, text) { await input(page).fill(text); await submit(page).click(); }
 
 test('two accounts exchange NIP-17 through separate authenticated inbox relays and see the same timeline after reload', async ({ page, browser }) => {
@@ -60,14 +55,14 @@ test('an account chooses its public inbox and an unpublished contact keeps the n
   const me = identity(), peer = identity();
   const a = relay(), b = relay();
   await login(page, me, { 'one.test': a, 'two.test': b }, ['one.test','two.test'], archive());
-  await page.getByRole('button', { name: 'Set up message inbox' }).click();
-  const settings = page.getByRole('dialog', { name: 'Settings' });
+  const settings = await openSettings(page);
   const section = settings.getByRole('region', { name: 'Message inbox' });
+  await section.getByRole('button', { name: 'Change inbox relays' }).click();
   await section.getByRole('checkbox', { name: 'wss://two.test' }).uncheck();
   await section.getByRole('button', { name: 'Publish inbox relays' }).click();
   await expect(section.getByRole('button', { name: 'Change inbox relays' })).toBeVisible();
-  expect(a.writes[0].kind).toBe(10050); expect(verifyEvent(a.writes[0])).toBe(true);
-  expect(a.writes[0].tags).toEqual([['relay','wss://one.test']]);
+  expect(a.writes.map(e => e.tags)).toEqual([[['relay','wss://one.test'],['relay','wss://two.test']], [['relay','wss://one.test']]]);
+  expect(a.writes.every(e => e.kind === 10050 && verifyEvent(e))).toBe(true);
   await settings.getByRole('button', { name: 'Close' }).click();
   await newChat(page, peer); await send(page, 'Do not downgrade');
   await expect(page.getByRole('alert')).toContainText('No NIP-17 inbox');
@@ -76,6 +71,8 @@ test('an account chooses its public inbox and an unpublished contact keeps the n
   await page.reload();
   const reopened = await openSettings(page);
   await expect(reopened.getByRole('button', { name: 'Change inbox relays' })).toBeVisible();
+  await expect(reopened.getByRole('region', { name: 'Message inbox' }).getByText('wss://two.test')).toHaveCount(0);
+  expect(a.writes).toHaveLength(2);
 });
 
 test('a delivered message survives a failed sender copy and reload without republishing to the recipient', async ({ page }) => {

@@ -122,8 +122,9 @@ test('loads signed profiles, uploads an avatar when one server fails, and publis
   }
   await page.getByLabel('Username').fill('Updated name');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect.poll(() => server.writes.length).toBe(1);
-  const saved = server.writes[0];
+  const profileWrites = () => server.writes.filter(event => event.kind === 0);
+  await expect.poll(() => profileWrites().length).toBe(1);
+  const [saved] = profileWrites();
   expect(saved.pubkey).toBe(me.pk);
   expect(saved.kind).toBe(0);
   expect(verifyEvent(saved)).toBe(true);

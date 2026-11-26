@@ -3,6 +3,7 @@ import { nsecEncode } from 'nostr-tools/nip19';
 import { getPublicKey } from 'nostr-tools/pure';
 import type { Event as NostrEvent } from 'nostr-tools';
 import useInboxRelays from '../hooks/useInboxRelays';
+import useDefaultInbox from '../hooks/useDefaultInbox';
 import usePrivateInbox from '../hooks/usePrivateInbox';
 import useHistory from '../hooks/useHistory';
 import useRelaySettings from '../hooks/useRelaySettings';
@@ -21,7 +22,7 @@ export interface Conversation {
   picture?: string;
 }
 
-export default function ChatPage() {
+export default function ChatPage({ registeredKey }: { registeredKey: string }) {
   const [keys, setKeys] = useState<{ sk: Uint8Array; pk: string } | null>(null);
   const [primalEnabled, setPrimalEnabled] = useState(false);
   const [keyError, setKeyError] = useState(false);
@@ -66,8 +67,8 @@ export default function ChatPage() {
   const notePeer = useCallback((peer: string, time: number) => {
     setLatest(prev => (prev[peer] ?? -1) >= time ? prev : { ...prev, [peer]: time });
   }, []);
-  const dmInbox = useInboxRelays(keys, relays);
-  const gifts = usePrivateInbox(keys, dmInbox, notePeer);
+  const directory = useInboxRelays(keys, relays);
+  const gifts = usePrivateInbox(keys, directory, notePeer);
   const receive = useCallback((event: NostrEvent) => {
     const peer = conversationPeer(event, pk);
     if (!peer) return;
@@ -78,8 +79,13 @@ export default function ChatPage() {
   const { profiles, acceptProfile } = useProfiles(relays, peers);
   const archive = useMemo(() => pk && primalEnabled ? new PrimalHistory(pk, acceptProfile) : null, [pk, primalEnabled, acceptProfile]);
   useEffect(() => () => archive?.close(), [archive]);
-  const history = useHistory(relays, pk, undefined, receive, archive, gifts.history, dmInbox.signAuth);
-  const relaySettings = useRelaySettings(relays, pk, selected, history, receive, dmInbox.signAuth);
+  const history = useHistory(relays, pk, undefined, receive, archive, gifts.history, directory.signAuth);
+  const dmInbox = useDefaultInbox(directory, relays, history.status.byRelay, history.retry, !!pk && pk === registeredKey);
+  const relaySettings = useRelaySettings(relays, pk, selected, history, receive, directory.signAuth);
+  function retryRelays() {
+    if (!directory.hasList) directory.refresh();
+    relaySettings.retry();
+  }
   function changePrimal(enabled: boolean) {
     if (!pk) return;
     setPrimalHistoryEnabled(pk, enabled);
@@ -102,7 +108,7 @@ export default function ChatPage() {
   if (!keys) return <p role="status">Opening your inbox…</p>;
   const sidebar = <ConversationList dmInbox={dmInbox} giftHistory={gifts.history} {...{ conversations, history, darkMode, setDarkMode, relays }} onSelect={select} onRelaysChange={changeRelays}
     onCopyNsec={() => navigator.clipboard.writeText(nsecEncode(keys.sk))}
-    relayStates={relaySettings.states} onRetryRelays={relaySettings.retry} primalEnabled={primalEnabled} onPrimalChange={changePrimal} />;
+    relayStates={relaySettings.states} onRetryRelays={retryRelays} primalEnabled={primalEnabled} onPrimalChange={changePrimal} />;
   const thread = current && <MessageList key={current.pubkey} conversation={current} isDarkMode={darkMode}
     account={keys} relays={relays} archive={archive} hasLegacy={legacyPeers.has(current.pubkey)}
     dmInbox={dmInbox} giftHistory={gifts.history} privateMessages={gifts.threads[current.pubkey]} acceptWrap={gifts.accept} onRelayStatus={relaySettings.reportThread} onBack={mobile ? () => setSelected(null) : undefined} />;

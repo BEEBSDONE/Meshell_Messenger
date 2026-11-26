@@ -3,9 +3,9 @@ import { type Event } from 'nostr-tools/pure';
 import { openPrivateMessage, type Account, type Rumor } from '../utils/privateMessages';
 import { pendingPeers } from '../utils/messageOutbox';
 import { useRelayHistory } from './useHistory';
-import type { InboxRelays } from './useInboxRelays';
+import type { InboxDirectory } from './useInboxRelays';
 
-export default function usePrivateInbox(account: Account | null, inbox: InboxRelays,
+export default function usePrivateInbox(account: Account | null, inbox: InboxDirectory,
   onPeer: (peer: string, time: number) => void) {
   const [threads, setThreads] = useState<Record<string, Record<string, Rumor>>>({});
   const accept = useCallback((wrap: Event) => {

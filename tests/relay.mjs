@@ -28,11 +28,17 @@ export async function openSettings(page) {
   return page.getByRole('dialog', { name: 'Settings' });
 }
 
+export async function newChat(page, peer) {
+  await page.getByRole('button', { name: '+', exact: true }).click();
+  await page.getByPlaceholder("Enter recipient's npub").fill(peer.npub);
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+}
+
 export const dot = (dialog, url) => dialog.getByRole('listitem').filter({ has: dialog.page().getByText(url, { exact: true }) }).getByRole('img');
 
 // Every WebSocket is intercepted locally. Fixtures still pass through the
 // production signature verification, recipient filters and NIP-04 decryption.
-export async function login(page, user, servers, initial = Object.keys(servers), primalSocket) {
+export async function routeRelays(page, servers, primalSocket) {
   await page.routeWebSocket(/.*/, ws => {
     if (ws.url() === 'wss://cache2.primal.net/v1' && primalSocket) return primalSocket(ws);
     const server = servers[new URL(ws.url()).hostname];
@@ -65,7 +71,8 @@ export async function login(page, user, servers, initial = Object.keys(servers),
             if (matchFilters(entry.filters, arg)) entry.deliver(arg);
           }
         }
-        send(['OK', arg.id, !server.rejectWrites, server.rejectWrites ? 'blocked: test' : '']);
+        const confirm = () => send(['OK', arg.id, !server.rejectWrites, server.rejectWrites ? 'blocked: test' : '']);
+        if (!server.holdConfirmation?.(arg, confirm)) confirm();
         return;
       }
       if (command !== 'REQ') return;
@@ -78,23 +85,31 @@ export async function login(page, user, servers, initial = Object.keys(servers),
       subs.set(arg, entry);
       server.live.add(entry);
       if (server.silent) return;
-      const sent = new Set();
-      for (const f of rest) {
-        const matches = server.events.filter(e => matchFilters([f], e))
-          .sort((a, b) => b.created_at - a.created_at || a.id.localeCompare(b.id))
-          .slice(0, Math.min(f.limit ?? Infinity, server.cap));
-        for (const event of matches) {
-          if (!sent.has(event.id)) entry.deliver(event);
-          sent.add(event.id);
+      function history() {
+        if (!subs.has(arg)) return;
+        const sent = new Set();
+        for (const f of rest) {
+          const matches = server.events.filter(e => matchFilters([f], e))
+            .sort((a, b) => b.created_at - a.created_at || a.id.localeCompare(b.id))
+            .slice(0, Math.min(f.limit ?? Infinity, server.cap));
+          for (const event of matches) {
+            if (!sent.has(event.id)) entry.deliver(event);
+            sent.add(event.id);
+          }
         }
+        send(['EOSE', arg]);
       }
-      send(['EOSE', arg]);
+      if (!server.holdRead?.(rest, history)) history();
     });
     ws.onClose(() => {
       server.sockets.delete(ws);
       for (const entry of subs.values()) server.live.delete(entry);
     });
   });
+}
+
+export async function login(page, user, servers, initial = Object.keys(servers), primalSocket) {
+  await routeRelays(page, servers, primalSocket);
   await page.addInitScript(hosts => {
     if (!localStorage.getItem('relays')) localStorage.setItem('relays', JSON.stringify(hosts.map(h => 'wss://' + h)));
   }, initial);

@@ -65,6 +65,7 @@ const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) =
 };
 
 const App: React.FC = () => {
+  const [registeredKey, setRegisteredKey] = useState('');
   return (
     <Router>
       <Routes>
@@ -72,7 +73,7 @@ const App: React.FC = () => {
           path="/"
           element={
             <RequireAuth>
-              <LoginPage />
+              <LoginPage onRegister={setRegisteredKey} />
             </RequireAuth>
           }
         />
@@ -80,7 +81,7 @@ const App: React.FC = () => {
           path="/chat"
           element={
             <RequireAuth>
-              <ChatPage />
+              <ChatPage registeredKey={registeredKey} />
             </RequireAuth>
           }
         />

@@ -7,7 +7,7 @@ import ProfileModal from './ProfileModal';
 import { setDarkMode as storeDarkMode } from '../utils/storage';
 import MeshellLogo from '../assets/MeShell_Logo.svg';
 
-import type { InboxRelays } from '../hooks/useInboxRelays';
+import type { InboxRelays } from '../hooks/useDefaultInbox';
 import type { Conversation } from './ChatPage';
 import type useHistory from '../hooks/useHistory';
 import type { RelayHistory } from '../hooks/useHistory';
@@ -86,7 +86,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
         </button>
       </div>
 
-      {!dmInbox.looking && !dmInbox.urls.length && <button className={styles.inboxSetup} onClick={() => setShowSettings(true)}>Set up message inbox</button>}
       <div aria-label="Conversations" role="region" className={styles.conversationsContainer}>
         {conversations.map(conversation => (
           <button type="button" key={conversation.pubkey} className={styles.conversationItem}

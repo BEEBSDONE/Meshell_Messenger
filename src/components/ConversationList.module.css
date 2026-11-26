@@ -243,4 +243,3 @@ input:checked + .slider .moonIcon {
 input:not(:checked) + .slider .sunIcon {
   color: var(--primary-color-light);
 }
-.inboxSetup { display: block; margin: .5rem auto; padding: .5rem .875rem; color: var(--text-color-light); background: var(--bg-color-light); border: 1px solid var(--border-color-light); border-radius: .25rem; cursor: pointer; }

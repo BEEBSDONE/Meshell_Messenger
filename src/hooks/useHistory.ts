@@ -36,15 +36,16 @@ export default function useHistory(relays: string[], account: string, peer: stri
   const legacy = useRelayHistory(relays, filters, onEvent, sign);
   const a = legacy.status, b = gifts.status;
   const status = useMemo(() => {
-    const byRelay: RelayStates = { ...a.byRelay };
-    for (const [url, state] of Object.entries(b.byRelay)) {
-      const old = byRelay[url];
-      byRelay[url] = old === 'failed' || state === 'failed' ? 'failed' :
-        old === 'checking' || state === 'checking' ? 'checking' : 'synced';
+    const byRelay: RelayStates = { ...b.byRelay };
+    for (const url of relays) {
+      const legacyState = readLegacy ? a.byRelay[url] ?? 'checking' : 'synced';
+      const giftState = b.byRelay[url] ?? 'checking';
+      byRelay[url] = legacyState === 'failed' || giftState === 'failed' ? 'failed' :
+        legacyState === 'checking' || giftState === 'checking' ? 'checking' : 'synced';
     }
     return { loading: a.loading || b.loading, hasOlder: a.hasOlder || b.hasOlder, failed: a.failed || b.failed,
       crowded: a.crowded || b.crowded, total: Object.keys(byRelay).length, byRelay };
-  }, [a, b]);
+  }, [a, b, readLegacy, relays]);
   const retryLegacy = legacy.retry, retryGifts = gifts.retry;
   const retry = useCallback(() => { retryLegacy(); retryGifts(); }, [retryLegacy, retryGifts]);
   const loadOlder = () => { if (a.hasOlder) legacy.loadOlder(); if (b.hasOlder) gifts.loadOlder(); };

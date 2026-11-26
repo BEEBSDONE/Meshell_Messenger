@@ -28,7 +28,7 @@ export const removeNsec = async (): Promise<void> => {
 
 const defaultRelays = [
   'wss://relay.damus.io', 'wss://nostr-pub.wellorder.net',
-  'wss://relay.nostr.band', 'wss://relay.snort.social',
+  'wss://relay.nostr.band', 'wss://relay.snort.social', 'wss://relay.primal.net',
 ];
 
 export function normalizeRelayUrl(value: unknown): string | null {
