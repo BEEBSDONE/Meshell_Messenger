@@ -1,15 +1,14 @@
 import React, { useRef, useState } from 'react';
-import { normalizeRelayUrl, removeRelays, removeDarkMode } from '../utils/storage';
+import { normalizeRelayUrl } from '../utils/storage';
 import { logout as forgetAccount, lockNow } from '../utils/session';
 import MessageInboxSettings from './MessageInboxSettings';
 import type { RelayHistory } from '../hooks/useHistory';
 import type { InboxRelays } from '../hooks/useDefaultInbox';
 import type { RelayStates, RelaySyncState } from '../utils/history';
 import styles from './SettingsPage.module.css';
+import type { CacheStatus } from '../utils/messageCache';
 
 const syncLabels: Record<RelaySyncState, string> = { synced: 'Synced', failed: 'Not synced', checking: 'Checking' };
-
-import type { CacheStatus } from '../utils/messageCache';
 
 interface SettingsPageProps {
   cacheStatus: CacheStatus;
@@ -67,9 +66,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ cacheStatus, onCacheChange,
     } catch {
       setLeaving(false);
       setNotice('Logout could not finish. Please try again.');
-      return;
     }
-    try { removeDarkMode(); removeRelays(); } finally { window.location.replace('/'); }
   };
 
   return (

@@ -108,12 +108,12 @@ export async function routeRelays(page, servers, primalSocket) {
   });
 }
 
-export async function login(page, user, servers, initial = Object.keys(servers), primalSocket) {
+export async function login(page, user, servers, initial = Object.keys(servers), primalSocket, entryURL = '/') {
   await routeRelays(page, servers, primalSocket);
   await page.addInitScript(hosts => {
     if (!localStorage.getItem('relays')) localStorage.setItem('relays', JSON.stringify(hosts.map(h => 'wss://' + h)));
   }, initial);
-  await page.goto('/');
+  await page.goto(entryURL);
   await page.getByPlaceholder('Enter your nsec').fill(user.nsec);
   await page.getByRole('button', { name: 'Login', exact: true }).click();
   await setupPin(page);

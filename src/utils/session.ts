@@ -2,6 +2,7 @@ import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import type { Account } from './privateMessages';
 import { commitKeys, decodeNsec, legacyAccount, readKeys, type Vault } from './secureStorage';
 import { processKey } from './keyWorker';
+import { removeDarkMode, removeRelays } from './storage';
 
 type Setup = { mode: 'setup'; source: 'legacy' | 'register' | 'import' | 'recovery'; pk: string; vault?: Vault };
 type Session = { mode: 'loading' | 'empty' } | { mode: 'error'; message: string } | Setup |
@@ -127,5 +128,9 @@ export async function logout() {
   if (!sameVault(record.vault, vault)) { void refreshSession(); throw Error('Account changed.'); }
   legacyAccount(record)?.sk.fill(0);
   await commitKeys(record, undefined, signal);
-  reset(); notify(); update({ mode: 'empty' });
+  reset();
+  update({ mode: 'loading' });
+  notify();
+  try { removeDarkMode(); removeRelays(); } catch { /* Optional settings may already be unavailable. */ }
+  window.location.replace('/');
 }

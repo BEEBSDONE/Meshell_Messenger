@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { createServer } from 'node:http';
 import { finalizeEvent } from 'nostr-tools/pure';
 import { createRumor, createSeal, createWrap } from 'nostr-tools/nip59';
 import { dm, identity, inboxList, login, openSettings, relay, reopen, routeRelays, setupPin, unlock } from './relay.mjs';
@@ -91,17 +92,44 @@ test('logout clears offline rows and a different imported account starts with ca
   expect(await rows(page)).toEqual([]); await expect(chat(page,peer)).toHaveCount(0);
 });
 
-test.describe('installed PWA', () => {
-  test.use({ serviceWorkers: 'allow' });
+const installed = test.extend({
+  origin: async ({ baseURL }, use) => {
+    // Stop the actual origin. The browser must use its installed service worker even for navigation.
+    const server = createServer(async (request, response) => {
+      try {
+        const upstream = await fetch(new URL(request.url, baseURL));
+        response.writeHead(upstream.status, {
+          'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
+          'Cache-Control': 'no-store',
+        });
+        response.end(Buffer.from(await upstream.arrayBuffer()));
+      } catch { response.writeHead(502).end(); }
+    });
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    async function disconnect() {
+      if (!server.listening) return;
+      const closed = new Promise(resolve => server.close(resolve));
+      server.closeAllConnections();
+      await closed;
+    }
+    try { await use({ url: 'http://127.0.0.1:' + server.address().port, disconnect }); }
+    finally { await disconnect(); }
+  },
+});
+installed.describe('installed PWA', () => {
+  installed.use({ serviceWorkers: 'allow' });
 
-  test('the lock screen, key worker and cached chats reopen with the device offline', async ({ page, context }) => {
+  installed('the lock screen, key worker and cached chats reopen with the site and relays offline', async ({ page, context, origin }) => {
     const me = identity(), peer = identity();
     const server = relay([
       await dm(peer, me, 120, 'Offline legacy history'),
       gift(peer, me, 'Offline private history'),
       inboxList(me, ['chat.test']),
     ]);
-    await login(page, me, { 'chat.test': server }, undefined, archive);
+    await login(page, me, { 'chat.test': server }, undefined, archive, origin.url);
     const settings = await openSettings(page);
     await opt(settings).check();
     await expect.poll(async () => (await rows(page)).length).toBe(2);
@@ -109,13 +137,16 @@ test.describe('installed PWA', () => {
 
     server.events = [];
     server.rejectReads = true;
-    await context.setOffline(true);
-    await page.reload();
-    await expect(page.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
-    await expect(chat(page, peer)).toHaveCount(0);
-    await unlock(page);
-    await chat(page, peer).click();
-    await expect(page.getByText('Offline legacy history', { exact: true })).toBeVisible();
-    await expect(page.getByText('Offline private history', { exact: true })).toBeVisible();
+    const reopened = await context.newPage();
+    await routeRelays(reopened, { 'chat.test': server }, archive);
+    await page.close();
+    await origin.disconnect();
+    await reopened.goto(origin.url + '/chat');
+    await expect(reopened.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
+    await expect(chat(reopened, peer)).toHaveCount(0);
+    await unlock(reopened);
+    await chat(reopened, peer).click();
+    await expect(reopened.getByText('Offline legacy history', { exact: true })).toBeVisible();
+    await expect(reopened.getByText('Offline private history', { exact: true })).toBeVisible();
   });
 });

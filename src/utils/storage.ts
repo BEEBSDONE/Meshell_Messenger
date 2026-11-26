@@ -27,7 +27,7 @@ export function getRelays(): string[] {
   return [...defaultRelays];
 }
 
-// Only the user's choice is persistent. Archived messages stay in memory.
+// The Primal lookup preference is independent of the opt-in device history.
 export function primalHistoryEnabled(pubkey: string): boolean {
   const saved = localStorage.getItem('primalHistory:' + pubkey);
   return saved === null || saved === 'enabled';
