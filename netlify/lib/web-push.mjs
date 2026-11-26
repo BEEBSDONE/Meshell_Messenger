@@ -87,7 +87,8 @@ async function deliver(store, owner, keys, event, send, now) {
     try {
       const subscription = unseal(row.data.ciphertext, keyFor(keys.privateKey, 'devices-v1'), device);
       await send(subscription, JSON.stringify({ v: 1, device }), {
-        TTL: 120, urgency: 'normal', topic: 'meshell-activity', timeout: 6000,
+        // Queue one generic alert through a night offline and wake a sleeping phone on delivery.
+        TTL: 24 * 60 * 60, urgency: 'high', topic: 'meshell-activity', timeout: 6000,
         vapidDetails: { subject: 'https://msg.meshell.io', ...keys },
       });
     } catch (error) {

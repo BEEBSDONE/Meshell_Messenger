@@ -79,6 +79,7 @@ test('signed gift wraps fan out once per burst, conceal subscriptions and never 
     const delivered = f.sent.find(x => x.sub.endpoint === d.subscription.endpoint);
     assert.deepEqual(delivered.payload, { v: 1, device: createHash('sha256').update(d.token).digest('hex') });
     assert.ok(delivered.options.vapidDetails.privateKey); assert.equal(delivered.options.topic, 'meshell-activity');
+    assert.equal(delivered.options.TTL, 86400); assert.equal(delivered.options.urgency, 'high');
   }
   await f.request('notify', f.gift(), { now: now + 1000 }); await f.drain();
   await f.request('notify', wrap, { now: now + 30000 }); await f.drain();
