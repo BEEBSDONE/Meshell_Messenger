@@ -14,7 +14,7 @@ function changed() {
 }
 export const supported = () => window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
-function post(action: string, body: object, authorization?: string) {
+async function post(action: string, body: object, authorization?: string) {
   const data = JSON.stringify(body);
   return fetch(api + action, {
     method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store',
@@ -23,7 +23,7 @@ function post(action: string, body: object, authorization?: string) {
   });
 }
 export function notifyRecipient(wrap: Event) {
-  // Independent of both relay acknowledgements and the recipient's push preference.
+  // A notification failure must never change the outcome of a confirmed send.
   void post('notify', wrap).catch(() => {});
 }
 export async function readDevice(): Promise<PushDevice | undefined> {
@@ -92,10 +92,10 @@ async function cleanup() {
   } finally { db.close(); }
 }
 
-async function register(account: Account, vaultId: string, sub: PushSubscription, existing?: PushDevice) {
+async function register(account: Account, vaultId: string, sub: PushSubscription, existing?: PushDevice,
+  token = existing?.token ?? crypto.randomUUID()): Promise<void> {
   const session = sessionSnapshot();
   if (session.mode !== 'open' || session.account !== account) throw Error('Unlock MeShell to finish setting up notifications.');
-  const token = existing?.token ?? crypto.randomUUID();
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
   const device = Array.from(digest, n => n.toString(16).padStart(2, '0')).join('');
   const marker = { account: account.pk, vaultId, device, token, endpoint: sub.endpoint, active: false };
@@ -104,6 +104,10 @@ async function register(account: Account, vaultId: string, sub: PushSubscription
   const auth = await getToken(new URL(api + 'subscribe', location.origin).href, 'POST',
     template => finalizeEvent(template, account.sk), true, body);
   const res = await post('subscribe', body, auth);
+  if (res.status === 410 && token === existing?.token) {
+    // A provider retired the old subscription. Only a newly signed registration can replace it.
+    return register(account, vaultId, sub, existing, crypto.randomUUID());
+  }
   if (!res.ok) throw Error(res.status === 409 ? 'Device registrations changed or are full. Try again.' : 'Could not register this device. Try again.');
   try { await saveDevice({ ...marker, active: true }, token); }
   catch (error) {
@@ -122,8 +126,7 @@ export function enablePush(account: Account, vaultId: string, setup: Awaited<Ret
 export async function reconcilePush(account: Account, vaultId: string) {
   const device = await readDevice();
   if (!device || device.vaultId !== vaultId || !supported()) return;
-  if (Notification.permission === 'denied') { await removeDevice(device.token); return; }
-  if (Notification.permission !== 'granted') return;
+  if (Notification.permission !== 'granted') { await removeDevice(device.token); return; }
   const reg = await navigator.serviceWorker.getRegistration();
   if (!reg?.active) return;
   const sub = await reg.pushManager.getSubscription();

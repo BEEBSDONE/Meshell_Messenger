@@ -32,7 +32,8 @@ function validSubscription(input) {
       url.hostname.endsWith('.push.apple.com') || url.hostname.endsWith('.notify.windows.com');
     if (!allowed || url.protocol !== 'https:' || url.username || url.password || url.port || url.hash || url.pathname === '/') return false;
     const { auth, p256dh } = input.keys;
-    if (!/^[\w-]{22}$/.test(auth) || !/^[\w-]{87}$/.test(p256dh)) return false;
+    if (typeof auth !== 'string' || typeof p256dh !== 'string' ||
+        !/^[\w-]{22}$/.test(auth) || !/^[\w-]{87}$/.test(p256dh)) return false;
     const point = Buffer.from(p256dh, 'base64url');
     return point.length === 65 && point[0] === 4 && !!ECDH.convertKey(point, 'prime256v1');
   } catch { return false; }
@@ -42,7 +43,8 @@ function seal(sub, key, device) {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   cipher.setAAD(Buffer.from(device));
-  const data = Buffer.concat([cipher.update(JSON.stringify({ endpoint: sub.endpoint, keys: sub.keys })), cipher.final()]);
+  const { auth, p256dh } = sub.keys;
+  const data = Buffer.concat([cipher.update(JSON.stringify({ endpoint: sub.endpoint, keys: { auth, p256dh } })), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), data]).toString('base64url');
 }
 function unseal(value, key, device) {
@@ -64,9 +66,9 @@ async function readDevices(store, owner) {
 function validWrap(event, now) {
   if (event?.kind !== 1059 || !Number.isSafeInteger(event.created_at) || event.created_at > now / 1000 + 300 ||
       event.created_at < now / 1000 - 3 * 86400 || !Array.isArray(event.tags) || event.tags.length !== 1 ||
-      event.tags[0]?.[0] !== 'p' || !hexKey.test(event.tags[0]?.[1]) ||
+      event.tags[0]?.[0] !== 'p' || typeof event.tags[0][1] !== 'string' || !hexKey.test(event.tags[0][1]) ||
       typeof event.content !== 'string' || event.content.length < 132 || !/^[A-Za-z0-9+/]+=*$/.test(event.content)) return false;
-  return verifyEvent(event);
+  try { return verifyEvent(event); } catch { return false; }
 }
 
 async function deliver(store, owner, keys, event, send, now) {
@@ -107,7 +109,7 @@ async function manage(store, owner, keys, action, data, now) {
     return response(result.modified ? 204 : 409);
   }
   if (action === 'renew' && !row?.data.ciphertext) return response(404);
-  if (row?.data.revoked) return response(409);
+  if (row?.data.revoked) return response(410);
   const value = { device, ciphertext: seal(data.subscription, keyFor(keys.privateKey, 'devices-v1'), device) };
   if (row) {
     const result = await store.setJSON(row.key, value, condition(row));
@@ -148,7 +150,8 @@ export async function handlePush(request, { store, waitUntil, send = sendNotific
     if (!validWrap(data, now)) return response(400);
     pk = data.tags[0][1];
   } else {
-    if (!hexKey.test(data?.account) || !tokenPattern.test(data?.token)) return response(400);
+    if (typeof data?.account !== 'string' || typeof data.token !== 'string' ||
+        !hexKey.test(data.account) || !tokenPattern.test(data.token)) return response(400);
     pk = data.account;
     if (action !== 'revoke' && !validSubscription(data.subscription)) return response(400);
     if (action === 'subscribe') {

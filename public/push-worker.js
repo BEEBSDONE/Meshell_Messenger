@@ -28,8 +28,11 @@ self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window' });
-    const app = windows.find(client => new URL(client.url).origin === self.location.origin);
-    if (app) { await app.focus(); return; }
+    for (const client of windows) {
+      const url = new URL(client.url);
+      if (url.origin !== self.location.origin || !['/', '/chat', '/lock'].includes(url.pathname)) continue;
+      try { await client.focus(); return; } catch { /* The window may have closed. */ }
+    }
     await self.clients.openWindow('/lock');
   })());
 });

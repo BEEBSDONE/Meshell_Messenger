@@ -6,7 +6,7 @@ import { changeEvent, enablePush, pushSetup, readDevice, removeDevice, supported
 export default function PushSettings({ account, vaultId }: { account: Account; vaultId: string }) {
   const [record, setRecord] = useState<PushDevice>();
   const [setup, setSetup] = useState<Awaited<ReturnType<typeof pushSetup>>>();
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<boolean | null>(null);
   const [issue, setIssue] = useState('');
   const [attempt, setAttempt] = useState(0);
   const mounted = useRef(true);
@@ -30,22 +30,25 @@ export default function PushSettings({ account, vaultId }: { account: Account; v
   const blocked = available && Notification.permission === 'denied';
   const enabled = !!record;
   async function toggle() {
-    setBusy(true); setIssue('');
+    setPending(!enabled); setIssue('');
     try {
       if (record) await removeDevice(record.token);
       else if (setup) await enablePush(account, vaultId, setup, record);
     } catch (reason) {
       if (mounted.current) setIssue(reason instanceof Error && reason.name !== 'NotAllowedError'
         ? reason.message : 'Allow notifications in your browser settings to enable them.');
-    } finally { if (mounted.current) setBusy(false); }
+    } finally {
+      const current = await readDevice().catch(() => undefined);
+      if (mounted.current) { setRecord(current?.vaultId === vaultId ? current : undefined); setPending(null); }
+    }
   }
   return <>
-    <label><input type="checkbox" checked={enabled} disabled={busy || (!enabled && (!available || !setup || blocked))} onChange={toggle} />
+    <label><input type="checkbox" checked={pending ?? enabled} disabled={pending !== null || (!enabled && (!available || !setup || blocked))} onChange={toggle} />
       Enable notifications on this device</label>
     <small>{!available ? 'Use a browser with Web Push. On iPhone or iPad, open MeShell from the Home Screen.' :
       blocked ? 'Notifications are blocked in your browser settings.' :
       record && !record.active ? 'Registration is pending. Reconnect to finish or turn this off.' :
-      'Show a private alert for messages sent from MeShell.'}</small>
+      'Get a private alert for messages sent from MeShell. The notification service receives your public key and this browser’s push subscription.'}</small>
     {issue && <small role="status">{issue} {available && !setup && <button type="button"
       onClick={() => { setIssue(''); setAttempt(n => n + 1); }}>Retry notifications</button>}</small>}
   </>;

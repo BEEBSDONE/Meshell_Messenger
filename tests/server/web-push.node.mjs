@@ -100,6 +100,6 @@ test('expiration, rotation, independent devices, and revocation cannot resurrect
   await f.request('subscribe', next);
   assert.equal((await f.request('revoke', next)).status, 204);
   assert.equal((await f.request('renew', next)).status, 404);
-  assert.equal((await f.request('subscribe', next)).status, 409);
+  assert.equal((await f.request('subscribe', next)).status, 410);
   await f.request('notify', f.gift(), { now: now + 60000 }); await f.drain(); assert.equal(f.sent.length, 2);
 });

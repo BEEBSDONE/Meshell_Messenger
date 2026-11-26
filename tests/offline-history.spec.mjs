@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createServer } from 'node:http';
+import { servePwa } from './pwa-origin.mjs';
 import { finalizeEvent } from 'nostr-tools/pure';
 import { createRumor, createSeal, createWrap } from 'nostr-tools/nip59';
 import { dm, identity, inboxList, login, openSettings, relay, reopen, routeRelays, setupPin, unlock } from './relay.mjs';
@@ -94,29 +94,8 @@ test('logout clears offline rows and a different imported account starts with ca
 
 const installed = test.extend({
   origin: async ({ baseURL }, use) => {
-    // Stop the actual origin. The browser must use its installed service worker even for navigation.
-    const server = createServer(async (request, response) => {
-      try {
-        const upstream = await fetch(new URL(request.url, baseURL));
-        response.writeHead(upstream.status, {
-          'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
-          'Cache-Control': 'no-store',
-        });
-        response.end(Buffer.from(await upstream.arrayBuffer()));
-      } catch { response.writeHead(502).end(); }
-    });
-    await new Promise((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(0, '127.0.0.1', resolve);
-    });
-    async function disconnect() {
-      if (!server.listening) return;
-      const closed = new Promise(resolve => server.close(resolve));
-      server.closeAllConnections();
-      await closed;
-    }
-    try { await use({ url: 'http://127.0.0.1:' + server.address().port, disconnect }); }
-    finally { await disconnect(); }
+    const origin = await servePwa(baseURL);
+    try { await use(origin); } finally { await origin.disconnect(); }
   },
 });
 installed.describe('installed PWA', () => {
