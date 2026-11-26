@@ -124,6 +124,9 @@ test('a hidden session locks, blocks direct chat access and stops recurring key 
   await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});
   await expect(page.getByRole('heading',{name:'Unlock MeShell'})).toBeVisible();
   await page.goto('/chat'); await expect(page.getByRole('heading',{name:'Unlock MeShell'})).toBeVisible();
+  const response = await page.goto('/lock');
+  expect(response.status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
 });
 
 test('competing PIN migrations leave one verified record and preserve the original account', async ({ page, context })=>{
