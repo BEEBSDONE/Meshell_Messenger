@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { verifyEvent } from 'nostr-tools/pure';
 import { unwrapEvent } from 'nostr-tools/nip59';
-import { dot, identity, inboxList, login, newChat, openSettings, relay, routeRelays } from './relay.mjs';
+import { dot, identity, inboxList, login, newChat, openSettings, relay, routeRelays, setupPin, unlock, reopen } from './relay.mjs';
 
 const defaults = ['relay.damus.io', 'nostr-pub.wellorder.net', 'relay.nostr.band', 'relay.snort.social', 'relay.primal.net'];
 const snort = defaults[3], primal = defaults[4];
@@ -36,6 +36,7 @@ test('registers on a phone and sends on the first tap using only synced Snort an
   await routeRelays(page, servers, archive);
   await page.goto('/');
   await page.getByRole('button', { name: 'Register', exact: true }).click();
+  await setupPin(page);
   await newChat(page, peer);
   const text = 'My first private message';
   await message(page).fill(text);
@@ -71,11 +72,12 @@ test('all five healthy defaults are published once and survive a reload', async 
   const servers = Object.fromEntries(defaults.map(host => [host, relay()]));
   await routeRelays(page, servers, archive);
   await page.goto('/'); await page.getByRole('button', { name: 'Register' }).click();
+  await setupPin(page);
   await expect.poll(() => defaults.filter(host => lists(servers[host]).length === 1)).toEqual(defaults);
   const [list] = lists(servers[primal]);
   expect(list.tags).toEqual(tags(defaults));
   expect(new Set(defaults.map(host => lists(servers[host])[0].id)).size).toBe(1);
-  await page.reload();
+  await reopen(page);
   const settings = await openSettings(page);
   for (const host of defaults) await expect(dot(settings, 'wss://' + host)).toHaveAccessibleName('Synced');
   expect(defaults.map(host => lists(servers[host]).length)).toEqual([1, 1, 1, 1, 1]);
@@ -153,6 +155,7 @@ test('a newly generated key can set up a synced relay that restricts directory r
   await page.addInitScript(() => localStorage.setItem('relays', JSON.stringify(['wss://members.test'])));
   await routeRelays(page, { 'members.test': server }, archive);
   await page.goto('/'); await page.getByRole('button', { name: 'Register' }).click();
+  await setupPin(page);
   const settings = await openSettings(page);
   await expect(inbox(settings).getByRole('button', { name: 'Change inbox relays' })).toBeVisible();
   expect(lists(server).map(e => e.tags)).toEqual([tags(['members.test'])]);
@@ -168,6 +171,7 @@ test('two tabs setting up the same account announce a single signed list', async
   const other = await context.newPage();
   await routeRelays(other, { 'shared.test': server }, archive);
   await other.goto('/chat');
+  await unlock(other);
   await expect.poll(() => pending.length).toBe(2);
   pending.forEach(release => release());
   for (const tab of [page, other]) {

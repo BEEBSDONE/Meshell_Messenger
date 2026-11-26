@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { normalizeRelayUrl, removeNsec, removeRelays, removePrivateKey, removeDarkMode } from '../utils/storage';
+import { normalizeRelayUrl, removeRelays, removeDarkMode } from '../utils/storage';
+import { logout as forgetAccount, lockNow } from '../utils/session';
 import MessageInboxSettings from './MessageInboxSettings';
 import type { RelayHistory } from '../hooks/useHistory';
 import type { InboxRelays } from '../hooks/useDefaultInbox';
@@ -8,7 +9,11 @@ import styles from './SettingsPage.module.css';
 
 const syncLabels: Record<RelaySyncState, string> = { synced: 'Synced', failed: 'Not synced', checking: 'Checking' };
 
+import type { CacheStatus } from '../utils/messageCache';
+
 interface SettingsPageProps {
+  cacheStatus: CacheStatus;
+  onCacheChange: (enabled: boolean) => void;
   dmInbox: InboxRelays;
   giftHistory: RelayHistory;
   onCopyNsec: () => Promise<void>;
@@ -21,7 +26,7 @@ interface SettingsPageProps {
   setShowSettings: (show: boolean) => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ dmInbox, giftHistory, onCopyNsec, setShowSettings, relayList, relayStates, onRetryRelays, onChange, primalEnabled, onPrimalChange }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ cacheStatus, onCacheChange, dmInbox, giftHistory, onCopyNsec, setShowSettings, relayList, relayStates, onRetryRelays, onChange, primalEnabled, onPrimalChange }) => {
   const [relayInput, setRelayInput] = useState('');
   const confirmation = useRef<HTMLDialogElement>(null);
   const [notice, setNotice] = useState('');
@@ -58,17 +63,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ dmInbox, giftHistory, onCop
     if (leaving) return;
     setLeaving(true);
     try {
-      await removeNsec();
+      await forgetAccount();
     } catch {
       setLeaving(false);
       setNotice('Logout could not finish. Please try again.');
       return;
     }
-    try {
-      removeDarkMode();
-      removePrivateKey();
-      removeRelays();
-    } finally { window.location.replace('/'); }
+    try { removeDarkMode(); removeRelays(); } finally { window.location.replace('/'); }
   };
 
   return (
@@ -106,6 +107,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ dmInbox, giftHistory, onCop
           Read history from Primal
         </label>
         <small>Primal receives your public key and your conversation partners’ public keys.</small>
+        <label>
+          <input type="checkbox" checked={cacheStatus.enabled} disabled={cacheStatus.busy} onChange={e => onCacheChange(e.target.checked)} />
+          Save encrypted messages for offline use
+        </label>
+        <small>Open saved chats with your PIN. Turning this off deletes their cached copies from this device.</small>
+        {cacheStatus.error && <small role="status">{cacheStatus.error}</small>}
+        <button className={styles.close} onClick={lockNow}>Lock now</button>
         <button className={styles.logout} onClick={() => { setNotice(''); confirmation.current?.showModal(); }}>
           Logout
         </button>

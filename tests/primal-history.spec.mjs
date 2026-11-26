@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { finalizeEvent } from 'nostr-tools/pure';
-import { dm, dot, identity, login, openSettings, relay } from './relay.mjs';
+import { dm, dot, identity, login, openSettings, relay, reopen } from './relay.mjs';
 
 const inbox = page => page.getByRole('region', { name: 'Conversations' });
 const thread = page => page.getByRole('region', { name: 'Messages', exact: true });
@@ -85,7 +85,7 @@ test('recovers Primal-only incoming and sent chats, names and reloads with four 
   await expect(settings.getByRole('checkbox', { name: 'Read history from Primal' })).toBeChecked();
   await settings.getByRole('button', { name: 'Close' }).click();
   for (let i = 0; i < 2; i++) {
-    if (i) await page.reload();
+    if (i) await reopen(page);
     await contact(page, 'Alice archive').click();
     await expect(thread(page)).toContainText('Primal incoming');
     await expect(thread(page).getByText('Primal reply', { exact: true })).toHaveCount(1);
@@ -200,7 +200,7 @@ test('cancels an old thread request and lets the user switch off future cache re
   await page.getByRole('checkbox', { name: 'Read history from Primal' }).uncheck();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   const count = archive.requests.length;
-  await page.reload();
+  await reopen(page);
   await expect(inbox(page)).toContainText('No conversations found');
   const settings = await openSettings(page);
   const preference = settings.getByRole('checkbox', { name: 'Read history from Primal' });

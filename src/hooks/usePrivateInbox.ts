@@ -6,16 +6,17 @@ import { useRelayHistory } from './useHistory';
 import type { InboxDirectory } from './useInboxRelays';
 
 export default function usePrivateInbox(account: Account | null, inbox: InboxDirectory,
-  onPeer: (peer: string, time: number) => void) {
+  onPeer: (peer: string, time: number) => void, remember: (event: Event) => void) {
   const [threads, setThreads] = useState<Record<string, Record<string, Rumor>>>({});
   const accept = useCallback((wrap: Event) => {
     if (!account) return;
     const message = openPrivateMessage(wrap, account);
     if (!message) return;
+    remember(wrap);
     const { peer, rumor } = message;
     onPeer(peer, rumor.created_at);
     setThreads(all => all[peer]?.[rumor.id] ? all : { ...all, [peer]: { ...all[peer], [rumor.id]: rumor } });
-  }, [account, onPeer]);
+  }, [account, onPeer, remember]);
   useEffect(() => {
     if (!account) return;
     let active = true;

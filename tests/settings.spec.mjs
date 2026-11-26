@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dm, dot, identity, login, openSettings, relay } from './relay.mjs';
+import { dm, dot, identity, login, openSettings, relay, setupPin, unlock, reopen } from './relay.mjs';
 
 function emptyArchive(ws) {
   ws.onMessage(raw => {
@@ -93,7 +93,7 @@ test('remembers a Primal opt-out across logout and enables history for a differe
   const signInAgain = async user => {
     await page.getByPlaceholder('Enter your nsec').fill(user.nsec);
     await page.getByRole('button', { name: 'Login', exact: true }).click();
-    await page.waitForURL('**/chat');
+    await setupPin(page);
   };
   const opt = dialog => dialog.getByRole('checkbox', { name: 'Read history from Primal' });
   const logout = async dialog => {
@@ -131,13 +131,14 @@ test('turning Primal off in Settings also stops archive reads in another open ta
     });
   });
   await second.goto('/chat');
+  await unlock(second);
   await expect.poll(() => reads.length).toBe(1);
   const firstSettings = await openSettings(page);
   const secondSettings = await openSettings(second);
   const name = 'Read history from Primal';
   await firstSettings.getByRole('checkbox', { name }).uncheck();
   await expect(secondSettings.getByRole('checkbox', { name })).not.toBeChecked();
-  await second.reload();
+  await reopen(second);
   await (await openSettings(second)).getByRole('checkbox', { name }).waitFor();
   expect(reads).toHaveLength(1);
   await firstSettings.getByRole('checkbox', { name }).check();

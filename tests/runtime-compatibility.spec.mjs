@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { test as base, expect } from '@playwright/test';
 import { finalizeEvent, verifyEvent } from 'nostr-tools/pure';
 import { nsecEncode, npubEncode } from 'nostr-tools/nip19';
-import { dm, identity, inboxList, login, openSettings, relay } from './relay.mjs';
+import { dm, identity, inboxList, login, openSettings, relay, setupPin, unlock, reopen } from './relay.mjs';
 
 // Signed and encrypted by the previously deployed nostr-tools 2.7.2, using
 // disposable secp256k1 scalars 1 (recipient) and 2 (sender) on local relays.
@@ -137,10 +137,12 @@ test('registration and direct chat links keep the account across reloads and res
   await expect(page.getByRole('button', { name: 'Register', exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
   await page.getByRole('button', { name: 'Register', exact: true }).click();
+  await setupPin(page);
   await expect(page).toHaveURL(/\/chat$/);
   await page.goto('/');
+  await unlock(page);
   await expect(page).toHaveURL(/\/chat$/);
-  await page.reload();
+  await reopen(page);
   const settings = await openSettings(page);
   await settings.getByRole('button', { name: 'Logout' }).click();
   await page.getByRole('dialog', { name: 'Log out of MeShell?' }).getByRole('button', { name: 'Logout' }).click();

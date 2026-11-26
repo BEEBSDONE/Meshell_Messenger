@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Event } from 'nostr-tools';
+import { verifyEvent } from 'nostr-tools/pure';
 import * as nip04 from 'nostr-tools/nip04';
 import useSendMessage from '../hooks/useSendMessage';
 import type { InboxRelays } from '../hooks/useDefaultInbox';
@@ -14,6 +15,8 @@ import ProfilePicture from './ProfilePicture';
 import styles from './MessageList.module.css';
 
 interface Props {
+  cachedLegacy?: Record<string, Event>;
+  rememberLegacy: (event: Event) => void;
   archive: PrimalHistory | null;
   hasLegacy: boolean;
   dmInbox: InboxRelays;
@@ -35,7 +38,7 @@ interface Message {
   text: string | null;
 }
 
-export default function MessageList({ account, conversation, relays, archive, hasLegacy, dmInbox, giftHistory, privateMessages, acceptWrap, isDarkMode, onBack, onRelayStatus }: Props) {
+export default function MessageList({ cachedLegacy, rememberLegacy, account, conversation, relays, archive, hasLegacy, dmInbox, giftHistory, privateMessages, acceptWrap, isDarkMode, onBack, onRelayStatus }: Props) {
   const { pk, sk } = account;
   const peer = conversation.pubkey;
   const [byId, setById] = useState<Record<string, Message>>({});
@@ -57,14 +60,16 @@ export default function MessageList({ account, conversation, relays, archive, ha
   }, [pk]);
   const decryptedIds = useRef(new Set<string>());
   const receive = useCallback(async (event: Event) => {
-    if (conversationPeer(event, pk) !== peer || decryptedIds.current.has(event.id)) return;
+    if (conversationPeer(event, pk) !== peer || decryptedIds.current.has(event.id) || !verifyEvent(event)) return;
     decryptedIds.current.add(event.id);
+    rememberLegacy(event);
     try {
       store(event, await nip04.decrypt(sk, peer, event.content));
     } catch {
       store(event, null);
     }
-  }, [peer, pk, sk, store]);
+  }, [peer, pk, sk, store, rememberLegacy]);
+  useEffect(() => { for (const event of Object.values(cachedLegacy ?? {})) void receive(event); }, [cachedLegacy, receive]);
   const history = useHistory(relays, pk, peer, receive, readLegacy ? archive : null, giftHistory, dmInbox.signAuth, readLegacy);
   const { byRelay } = history.status;
   const { retry } = history;

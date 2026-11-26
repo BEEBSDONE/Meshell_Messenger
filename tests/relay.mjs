@@ -116,5 +116,23 @@ export async function login(page, user, servers, initial = Object.keys(servers),
   await page.goto('/');
   await page.getByPlaceholder('Enter your nsec').fill(user.nsec);
   await page.getByRole('button', { name: 'Login', exact: true }).click();
+  await setupPin(page);
+}
+
+export const testPin = '083574';
+export async function typePin(page, pin = testPin) {
+  for (const digit of pin) await page.keyboard.press(digit);
+}
+export async function setupPin(page, pin = testPin) {
+  await page.getByRole('heading', { name: 'Create your PIN' }).waitFor();
+  await typePin(page, pin);
+  await page.getByRole('heading', { name: 'Confirm your PIN' }).waitFor();
+  await typePin(page, pin);
   await page.waitForURL('**/chat');
 }
+export async function unlock(page, pin = testPin) {
+  await page.getByRole('heading', { name: 'Unlock MeShell' }).waitFor();
+  await typePin(page, pin);
+  await page.waitForURL('**/chat');
+}
+export async function reopen(page) { await page.reload(); await unlock(page); }
