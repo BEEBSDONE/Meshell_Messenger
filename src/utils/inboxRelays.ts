@@ -3,6 +3,8 @@ import { subscribeRelay } from './history';
 import { normalizeRelayUrl } from './storage';
 import { pool, type AuthSigner } from './nostr';
 
+export const MAX_INBOX_RELAYS = 16;
+
 function usableInboxRelay(value: unknown, configured: string[]): string | null {
   const url = normalizeRelayUrl(value);
   if (!url) return null;
@@ -22,7 +24,7 @@ export function inboxUrls(event: Event | undefined, configured: string[]): strin
     if (tag[0] !== 'relay') continue;
     const url = usableInboxRelay(tag[1], configured);
     if (url) urls.add(url);
-    if (urls.size === 16) break;
+    if (urls.size === MAX_INBOX_RELAYS) break;
   }
   return [...urls];
 }
@@ -34,10 +36,11 @@ export function validInbox(event: Event, pubkey: string) {
 // Keep our own directory subscription live. A recipient lookup ends at EOSE
 // (or the deadline), including subscriptions reopened after an AUTH challenge.
 export function watchInbox(pubkey: string, urls: string[], sign: AuthSigner | undefined,
-  onEvent: (event: Event) => void, onReady: () => void, keepOpen: boolean) {
+  onEvent: (event: Event) => void, onReady: (checked: Set<string>) => void, keepOpen: boolean) {
   let active = true, ready = false;
   const subscriptions = new Set<ReturnType<typeof subscribeRelay>>();
   const finished = new Set<string>();
+  const checked = new Set<string>();
   const timer = setTimeout(reportReady, 5500);
   function close() {
     active = false;
@@ -50,7 +53,7 @@ export function watchInbox(pubkey: string, urls: string[], sign: AuthSigner | un
     ready = true;
     clearTimeout(timer);
     if (!keepOpen) close();
-    onReady();
+    onReady(checked);
   }
   function finish(url: string) {
     finished.add(url);
@@ -60,8 +63,11 @@ export function watchInbox(pubkey: string, urls: string[], sign: AuthSigner | un
     void pool.ensureRelay(url, { connectionTimeout: 5000 }).then(relay => {
       if (!active) return;
       const sub = subscribeRelay(relay, [{ kinds: [10050], authors: [pubkey], limit: 1 }], {
+        // Only a real EOSE before our deadline confirms the directory was read.
+        eoseTimeout: 15_000,
         onevent(event) { if (active && validInbox(event, pubkey)) onEvent(event); },
-        oneose: () => finish(url), onclose: () => finish(url),
+        oneose: () => { if (!ready) checked.add(url); finish(url); },
+        onclose: () => finish(url),
       }, sign);
       subscriptions.add(sub);
     }).catch(() => finish(url));

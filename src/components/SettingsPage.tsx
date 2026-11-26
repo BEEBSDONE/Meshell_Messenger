@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { normalizeRelayUrl, removeNsec, removeRelays, removePrivateKey, removeDarkMode } from '../utils/storage';
 import MessageInboxSettings from './MessageInboxSettings';
 import type { RelayHistory } from '../hooks/useHistory';
-import type { InboxRelays } from '../hooks/useInboxRelays';
+import type { InboxRelays } from '../hooks/useDefaultInbox';
 import type { RelayStates, RelaySyncState } from '../utils/history';
 import styles from './SettingsPage.module.css';
 

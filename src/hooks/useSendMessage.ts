@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { findInbox } from '../utils/inboxRelays';
 import { pendingMessage, reserveMessage, updatePending } from '../utils/messageOutbox';
 import { openPrivateMessage, prepareMessage, type Account, type PrivateDraft } from '../utils/privateMessages';
 import { publishConfirmed } from '../utils/nostr';
 import type { Event } from 'nostr-tools/pure';
-import type { InboxRelays } from './useInboxRelays';
+import type { InboxRelays } from './useDefaultInbox';
 
 export default function useSendMessage(account: Account, peer: string, configured: string[],
   inbox: InboxRelays, accept: (event: Event) => void) {
@@ -12,6 +12,7 @@ export default function useSendMessage(account: Account, peer: string, configure
   const [draft, setDraft] = useState<PrivateDraft>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const active = useRef(true), sending = useRef(false);
   useEffect(() => {
@@ -28,16 +29,24 @@ export default function useSendMessage(account: Account, peer: string, configure
     return () => { current = false; active.current = false; };
   }, [account, peer]);
 
-  async function send() {
+  function send() {
+    if (!text.trim() || sending.current || waiting || restoring) return;
+    setError('');
+    if (inbox.urls.length) { void deliver(); return; }
+    if (inbox.hasList || !configured.length) { setError(inbox.issue); return; }
+    if (inbox.issue) inbox.retrySetup();
+    setWaiting(true);
+  }
+  const { urls, readRelays, signAuth } = inbox;
+  const deliver = useCallback(async () => {
     const content = text.trim();
     if (!content || sending.current || restoring) return;
-    if (!inbox.urls.length) { setError('Set up your message inbox in Settings before sending.'); return; }
     sending.current = true; setBusy(true); setError('');
     let current = draft;
     try {
-      let destinations = inbox.urls;
+      let destinations = urls;
       if (peer !== account.pk && !current?.delivered) {
-        destinations = await findInbox(peer, inbox.readRelays, configured, inbox.signAuth);
+        destinations = await findInbox(peer, readRelays, configured, signAuth);
         if (!destinations.length) throw Error('No NIP-17 inbox was found for this contact. Ask them to publish their inbox relays, then retry.');
       }
       if (!current) {
@@ -52,7 +61,7 @@ export default function useSendMessage(account: Account, peer: string, configure
         }
       }
       if (!current.delivered) {
-        await publishConfirmed(destinations, current.toPeer, inbox.signAuth).catch(() => {
+        await publishConfirmed(destinations, current.toPeer, signAuth).catch(() => {
           throw Error('No relay confirmed this message. Your draft is ready to retry.');
         });
         current = { ...current, delivered: true };
@@ -60,7 +69,7 @@ export default function useSendMessage(account: Account, peer: string, configure
         await updatePending(account.pk, current, 'delivered');
       }
       if (peer !== account.pk) {
-        await publishConfirmed(inbox.urls, current.toSelf, inbox.signAuth).catch(() => {
+        await publishConfirmed(urls, current.toSelf, signAuth).catch(() => {
           throw Error('Your contact’s relay accepted the message. Retry to save your inbox copy.');
         });
       }
@@ -73,7 +82,13 @@ export default function useSendMessage(account: Account, peer: string, configure
       sending.current = false;
       if (active.current) setBusy(false);
     }
-  }
+  }, [account, peer, configured, urls, readRelays, signAuth, text, draft, restoring, accept]);
+  useEffect(() => {
+    if (!waiting || (!urls.length && !inbox.issue)) return;
+    setWaiting(false);
+    if (urls.length) void deliver();
+    else setError(inbox.issue);
+  }, [waiting, urls.length, inbox.issue, deliver]);
 
   async function discard() {
     if (!draft || draft.delivered || sending.current) return;
@@ -82,5 +97,5 @@ export default function useSendMessage(account: Account, peer: string, configure
       if (active.current) { setDraft(undefined); setError(''); }
     } catch { if (active.current) setError('Could not update your pending message. Please retry.'); }
   }
-  return { text, setText, busy, restoring, draft, error, send, discard };
+  return { text, setText, busy: busy || waiting, waiting, restoring, draft, error, send, discard };
 }

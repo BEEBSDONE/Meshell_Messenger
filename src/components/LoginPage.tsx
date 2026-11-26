@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router';
 import DOMPurify from 'dompurify'; // Import DOMPurify
 import { storeNsec, getDarkMode } from '../utils/storage'; // Added getDarkMode for dark mode persistence
 import { decodeNsec } from '../utils/nostr';
-import { generateSecretKey } from 'nostr-tools/pure';
+import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19'; // Import nip19 for encoding
 import styles from './LoginPage.module.css';
 import MeShellLogo from '../assets/MeShell_Logo.svg'; // Import the logo
 
-const LoginPage: React.FC = () => {
+const LoginPage: React.FC<{ onRegister: (pubkey: string) => void }> = ({ onRegister }) => {
   const [nsecInput, setNsecInput] = useState('');
   const [darkMode, setDarkMode] = useState(false); // Dark mode state
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +46,7 @@ const LoginPage: React.FC = () => {
       const sk = generateSecretKey(); // Generate a new secret key
       const nsec = nip19.nsecEncode(sk); // Encode it as nsec
       await storeNsec(nsec); // Wait for nsec to be stored in IndexedDB
+      onRegister(getPublicKey(sk));
       navigate('/chat', { replace: true }); // Redirect to chat page
     } catch (error) {
       console.error('Error during registration:', error);

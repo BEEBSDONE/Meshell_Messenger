@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { Event } from 'nostr-tools';
 import * as nip04 from 'nostr-tools/nip04';
 import useSendMessage from '../hooks/useSendMessage';
-import type { InboxRelays } from '../hooks/useInboxRelays';
+import type { InboxRelays } from '../hooks/useDefaultInbox';
 import type { Rumor } from '../utils/privateMessages';
 import useHistory, { type RelayHistory } from '../hooks/useHistory';
 import type { ThreadRelayStatus } from '../hooks/useRelaySettings';
@@ -118,7 +118,7 @@ export default function MessageList({ account, conversation, relays, archive, ha
       <form className={styles.inputContainer} onSubmit={e => { e.preventDefault(); followLatest.current = true; void composer.send(); }}>
         <input aria-label="Message" value={composer.text} disabled={composer.busy || composer.restoring} readOnly={!!composer.draft}
           onChange={e => composer.setText(e.target.value)} placeholder="Type your message..." />
-        <button disabled={composer.busy || composer.restoring || !composer.text.trim()}>{composer.busy ? 'Sending…' : composer.draft ? 'Retry' : 'Send'}</button>
+        <button disabled={composer.busy || composer.restoring || !composer.text.trim()}>{composer.waiting ? 'Preparing inbox…' : composer.busy ? 'Sending…' : composer.draft ? 'Retry' : 'Send'}</button>
       </form>
     </div>
   );
