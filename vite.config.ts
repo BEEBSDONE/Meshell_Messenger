@@ -20,7 +20,8 @@ export default defineConfig(({ command }) => ({
         name: 'MeShell Messenger',
         short_name: 'MeShell',
         description: 'A secure Nostr-based messaging client',
-        theme_color: '#ffffff',
+        theme_color: '#1a1a1a',
+        background_color: '#1a1a1a',
         icons: [
           {
             src: '/vite.svg',

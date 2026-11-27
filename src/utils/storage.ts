@@ -51,12 +51,16 @@ export const setRelays = (relays: string[]): void => {
 
 // Dark Mode Persistence
 export const getDarkMode = (): boolean => {
-  try { return localStorage.getItem('darkMode') === 'true'; } catch { return false; }
+  try { return localStorage.getItem('darkMode') !== 'false'; } catch { return true; }
 };
 
+export function applyDarkMode(dark: boolean): void {
+  document.body.classList.toggle('darkMode', dark);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1a1a1a' : '#ffffff');
+}
+
 export const setDarkMode = (isDarkMode: boolean): void => {
-  console.log(`Setting dark mode to: ${isDarkMode}`);
-  localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+  try { localStorage.setItem('darkMode', JSON.stringify(isDarkMode)); } catch { /* The active tab can still switch themes. */ }
 };
 
 // Add or confirm this function for saving the nickname to localStorage
