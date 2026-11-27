@@ -9,12 +9,14 @@ type Session = { mode: 'loading' | 'empty' } | { mode: 'error'; message: string 
   { mode: 'locked'; vault: Vault } | { mode: 'open'; account: Account; vault: Vault; fresh: boolean };
 
 const changeKey = 'meshell:account-change';
+const backgroundGraceMs = 10_000;
 const listeners = new Set<() => void>();
 let state: Session = { mode: 'loading' };
 let lifetime = new AbortController();
 let pending: Uint8Array | undefined;
 let channel: BroadcastChannel | undefined;
 let lastNotice = '';
+let background: { wallTime: number; monotonicTime: number; accountNotice: string | null; timer: number } | undefined;
 
 export const sessionSnapshot = () => state;
 export function subscribeSession(callback: () => void) {
@@ -22,11 +24,25 @@ export function subscribeSession(callback: () => void) {
   return () => { listeners.delete(callback); };
 }
 function update(next: Session) { state = next; listeners.forEach(fn => fn()); }
+function cancelBackgroundLock() {
+  if (background) window.clearTimeout(background.timer);
+  background = undefined;
+}
 function reset() {
+  cancelBackgroundLock();
   lifetime.abort();
   lifetime = new AbortController();
   if (state.mode === 'open') state.account.sk.fill(0);
   pending?.fill(0); pending = undefined;
+}
+function lockBackgroundSession() {
+  if (state.mode !== 'open') return;
+  const { vault } = state;
+  reset();
+  update({ mode: 'locked', vault });
+}
+function currentAccountNotice() {
+  try { return localStorage.getItem(changeKey); } catch { return null; }
 }
 function notify() {
   const id = crypto.randomUUID();
@@ -62,13 +78,38 @@ export function startSession() {
     if (e.key === changeKey && e.newValue) invalidate(e.newValue);
     else if (e.key === null || e.key === 'privateKey' || e.key === 'nsec') void refreshSession();
   });
-  const hide = () => { reset(); update({ mode: 'loading' }); };
+  const leavePage = () => {
+    document.documentElement.setAttribute('data-meshell-hidden', '');
+    reset(); update({ mode: 'loading' });
+  };
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) hide();
-    else if (state.mode === 'loading') void refreshSession();
+    if (document.hidden) {
+      if (state.mode !== 'open') { leavePage(); return; }
+      document.documentElement.setAttribute('data-meshell-hidden', '');
+      if (!background) background = {
+        wallTime: Date.now(), monotonicTime: performance.now(), accountNotice: currentAccountNotice(),
+        timer: window.setTimeout(lockBackgroundSession, backgroundGraceMs),
+      };
+      return;
+    }
+    // A suspended tab may have missed a lock or logout in another window.
+    if (state.mode === 'loading' || (background && background.accountNotice !== currentAccountNotice())) {
+      void refreshSession();
+    } else if (background) {
+      // Suspended tabs can resume before their timeout runs. Check elapsed time before revealing chat.
+      const elapsed = Date.now() - background.wallTime;
+      if (elapsed < 0 || elapsed >= backgroundGraceMs || performance.now() - background.monotonicTime >= backgroundGraceMs) {
+        lockBackgroundSession();
+      } else cancelBackgroundLock();
+    }
+    document.documentElement.removeAttribute('data-meshell-hidden');
   });
-  window.addEventListener('pagehide', hide);
-  window.addEventListener('pageshow', e => { if (e.persisted) void refreshSession(); });
+  window.addEventListener('pagehide', leavePage);
+  window.addEventListener('pageshow', event => {
+    if (!event.persisted) return;
+    void refreshSession();
+    if (!document.hidden) document.documentElement.removeAttribute('data-meshell-hidden');
+  });
   void refreshSession();
 }
 export function beginSetup(nsec?: string) {

@@ -34,7 +34,8 @@ export async function newChat(page, peer) {
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 }
 
-export const dot = (dialog, url) => dialog.getByRole('listitem').filter({ has: dialog.page().getByText(url, { exact: true }) }).getByRole('img');
+export const dot = (dialog, url) => dialog.getByRole('list', { name: 'Configured relays' })
+  .getByRole('listitem').filter({ has: dialog.page().getByText(url, { exact: true }) }).getByRole('img');
 
 // Every WebSocket is intercepted locally. Fixtures still pass through the
 // production signature verification, recipient filters and NIP-04 decryption.

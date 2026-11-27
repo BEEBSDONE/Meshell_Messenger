@@ -14,12 +14,13 @@
 
 .settingsPage > div {
   background-color: var(--bg-color-light);
-  padding: 20px;
-  border-radius: 8px;
+  padding: clamp(1rem, 4vw, 1.25rem);
+  border-radius: 12px;
   width: 400px;
-  max-width: calc(100% - 12px);
+  max-width: calc(100% - 24px);
   max-height: calc(100% - 16px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -33,8 +34,20 @@
 
 /* Relay section */
 .relaySection {
+  --settings-surface: #f6f6f5;
+  --settings-line: #d8d8d5;
+  --settings-muted: #545454;
+  --settings-accent: #985500;
+  color-scheme: light;
   width: 100%;
   text-align: center;
+}
+:global(.darkMode) .relaySection {
+  --settings-surface: #252525;
+  --settings-line: #444;
+  --settings-muted: #bebebe;
+  --settings-accent: #ffb842;
+  color-scheme: dark;
 }
 
 .relaySection h3 {
@@ -222,9 +235,74 @@
 .copyKey { border: 1px solid #aaa; border-radius: 4px; background: #e5e7eb; color: #151515; cursor: pointer; }
 .copyStatus { font-size: .875rem; margin-bottom: 0; }
 .copyStatus:empty { margin: 0; }
-.inbox { align-self: stretch; margin-bottom: 1rem; overflow-wrap: anywhere; }
-.inbox h3 { margin: 0; font-size: 1rem; }
-.inbox p { font-size: .875rem; margin: .4rem 0; }
-.inbox button { min-height: 40px; padding: .4rem .8rem; cursor: pointer; }
-.inbox small { display: block; }
-.inbox label { display: flex; align-items: center; gap: .4rem; min-height: 32px; font-size: .875rem; text-align: start; }
+
+.inbox, .preferences, .settingsActions {
+  align-self: stretch;
+  min-width: 0;
+  text-align: start;
+}
+.inbox, .preferences {
+  display: grid;
+  gap: .625rem;
+  border-top: 1px solid var(--settings-line);
+  padding-top: 1rem;
+  margin-bottom: 1.125rem;
+}
+.inbox h3, .preferences h3 { margin: 0; font-size: 1rem; line-height: 1.35; }
+.inbox p, .preference small, .preferenceStatus, .inbox small {
+  margin: 0;
+  font-size: .875rem;
+  line-height: 1.45;
+  color: var(--settings-muted);
+  overflow-wrap: anywhere;
+}
+.inboxList, .preferenceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--settings-surface);
+  border: 1px solid var(--settings-line);
+  border-radius: .625rem;
+}
+.inboxList > * + *, .preferenceList > * + * { border-top: 1px solid var(--settings-line); }
+.inboxList li, .inboxList label, .preference {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .175rem .875rem;
+  align-items: center;
+  padding: .625rem .875rem;
+}
+.inboxList li, .inboxList label { overflow-wrap: anywhere; font-size: .875rem; line-height: 1.4; }
+.inboxList label, .preference { min-height: 44px; box-sizing: border-box; cursor: pointer; }
+.preference { padding-block: .8rem; }
+.preference span { font-weight: 600; line-height: 1.35; }
+.preference small { grid-column: 1; }
+.preference input, .inboxList input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--settings-accent);
+}
+.preferenceStatus { display: grid; justify-items: start; gap: .4rem; padding: 0 .875rem .8rem; }
+.inboxActions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.secondaryAction, .publish, .settingsActions button {
+  min-height: 44px;
+  padding: .5rem .9rem;
+  border-radius: .55rem;
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.secondaryAction { border: 1px solid var(--settings-line); color: var(--text-color-light); background: var(--bg-color-light); }
+.inbox > button { justify-self: start; }
+.publish { border: 1px solid transparent; background: #ffa500; color: #211700; }
+.inbox button:disabled { opacity: .55; cursor: default; }
+.settingsActions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.settingsActions button { margin: 0; }
+.settingsActions .logout { background: #b42332; color: white; }
+.settingsActions .close { grid-column: 1 / -1; }
+.relaySection :is(button, input):focus-visible { outline: 2px solid var(--settings-accent); outline-offset: 2px; }
+@media (hover: hover) {
+  .secondaryAction:enabled:hover { background: var(--settings-surface); border-color: var(--settings-muted); }
+}

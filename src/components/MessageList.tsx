@@ -99,8 +99,9 @@ export default function MessageList({ cachedLegacy, rememberLegacy, account, con
         const box = e.currentTarget;
         followLatest.current = box.scrollHeight - box.scrollTop - box.clientHeight < 32;
       }}>
-        {!readLegacy && <button className={styles.legacyLookup} onClick={() => setSearchLegacy(true)}>Look for legacy messages</button>}
-        <HistoryControls history={history} items="messages" empty={!messages.length} />
+        <HistoryControls history={history} items="messages" empty={!messages.length}>
+          {!readLegacy && <button type="button" onClick={() => setSearchLegacy(true)}>Look for legacy messages</button>}
+        </HistoryControls>
         {messages.map((message, i) => {
           const date = new Date(message.time * 1000);
           const newDay = !i || date.toDateString() !== new Date(messages[i - 1].time * 1000).toDateString();

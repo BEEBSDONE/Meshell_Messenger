@@ -4,6 +4,7 @@ import { logout as forgetAccount, lockNow } from '../utils/session';
 import PushSettings from './PushSettings';
 import type { Account } from '../utils/privateMessages';
 import MessageInboxSettings from './MessageInboxSettings';
+import DevicePreference from './DevicePreference';
 import type { RelayHistory } from '../hooks/useHistory';
 import type { InboxRelays } from '../hooks/useDefaultInbox';
 import type { RelayStates, RelaySyncState } from '../utils/history';
@@ -81,7 +82,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ account, vaultId, cacheStat
           {Object.entries(syncLabels).map(([state, label]) =>
             <span key={state}><i className={styles.dot} data-state={state} aria-hidden="true" />{label}</span>)}
         </div>}
-        <ul className={styles.relayList}>
+        <ul className={styles.relayList} aria-label="Configured relays">
           {relayList.map(relay => {
             const state = relayStates[relay] ?? 'checking';
             return <li key={relay} className={styles.relayItem}>
@@ -103,25 +104,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ account, vaultId, cacheStat
           Add Relay
         </button>
         <MessageInboxSettings inbox={dmInbox} relays={relayList} states={relayStates} giftHistory={giftHistory} />
-        <label>
-          <input type="checkbox" checked={primalEnabled} onChange={e => onPrimalChange(e.target.checked)} />
-          Read history from Primal
-        </label>
-        <small>Primal receives your public key and your conversation partners’ public keys.</small>
-        <label>
-          <input type="checkbox" checked={cacheStatus.enabled} disabled={cacheStatus.busy} onChange={e => onCacheChange(e.target.checked)} />
-          Save encrypted messages for offline use
-        </label>
-        <small>Open saved chats with your PIN. Turning this off deletes their cached copies from this device.</small>
-        {cacheStatus.error && <small role="status">{cacheStatus.error}</small>}
-        <PushSettings account={account} vaultId={vaultId} />
-        <button className={styles.close} onClick={lockNow}>Lock now</button>
-        <button className={styles.logout} onClick={() => { setNotice(''); confirmation.current?.showModal(); }}>
-          Logout
-        </button>
-        <button className={styles.close} onClick={() => setShowSettings(false)}>
-          Close
-        </button>
+        <section className={styles.preferences} aria-labelledby="device-heading">
+          <h3 id="device-heading">Device preferences</h3>
+          <div className={styles.preferenceList}>
+            <DevicePreference title="Read history from Primal"
+              description="Primal receives your public key and your conversation partners’ public keys."
+              checked={primalEnabled} onChange={e => onPrimalChange(e.target.checked)} />
+            <div>
+              <DevicePreference title="Save encrypted messages for offline use"
+                description="Open saved chats with your PIN. Turning this off deletes their cached copies from this device."
+                checked={cacheStatus.enabled} disabled={cacheStatus.busy} onChange={e => onCacheChange(e.target.checked)} />
+              {cacheStatus.error && <small role="status" className={styles.preferenceStatus}>{cacheStatus.error}</small>}
+            </div>
+            <PushSettings account={account} vaultId={vaultId} />
+          </div>
+        </section>
+        <div className={styles.settingsActions}>
+          <button className={styles.secondaryAction} onClick={lockNow}>Lock now</button>
+          <button className={styles.logout} onClick={() => { setNotice(''); confirmation.current?.showModal(); }}>
+            Logout
+          </button>
+          <button className={styles.close} onClick={() => setShowSettings(false)}>Close</button>
+        </div>
       </div>
       <dialog ref={confirmation} className={styles.confirmation} aria-labelledby="logout-title" aria-describedby="logout-warning"
         onCancel={e => { if (leaving) e.preventDefault(); }}

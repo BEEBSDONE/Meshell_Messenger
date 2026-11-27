@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import DOMPurify from 'dompurify'; // Import DOMPurify
 import styles from './ProfileModal.module.css';
 import { encodeNpub, createEvent, pool, publishConfirmed } from '../utils/nostr';
@@ -16,11 +16,22 @@ interface ProfileModalProps {
   darkMode: boolean;
 }
 
+function onBackdrop(event: React.MouseEvent<HTMLDialogElement>) {
+  if (event.target !== event.currentTarget) return false;
+  const { left, right, top, bottom } = event.currentTarget.getBoundingClientRect();
+  return event.clientX < left || event.clientX >= right || event.clientY < top || event.clientY >= bottom;
+}
+
 const ProfileModal: React.FC<ProfileModalProps> = ({ account, setShowProfileModal, darkMode }) => {
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const { pk: pubkey, sk } = account;
   const npub = encodeNpub(pubkey);
   const [nickname, setNickname] = useState<string>('');
+  const dialog = useRef<HTMLDialogElement>(null);
+  const backdropPress = useRef(false);
+  useLayoutEffect(() => {
+    if (dialog.current && !dialog.current.open) dialog.current.showModal();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -100,7 +111,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ account, setShowProfileModa
       const event = createEvent(sk, eventTemplate);
       try {
         await publishConfirmed(relays, event);
-        setShowProfileModal(false);
+        dialog.current?.close();
       } catch (error) {
         console.error('Error sending metadata update:', error);
       }
@@ -110,8 +121,12 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ account, setShowProfileModa
   };
 
   return (
-    <div className={styles.modal}>
-      <div className={styles.modalContent}>
+      <dialog ref={dialog} aria-label="Profile" className={styles.modalContent} onClose={() => setShowProfileModal(false)}
+        onPointerDown={e => { backdropPress.current = onBackdrop(e); }}
+        onClick={e => {
+          if (backdropPress.current && onBackdrop(e)) e.currentTarget.close();
+          backdropPress.current = false;
+        }}>
         {/* Profile Picture Section */}
         <div className={styles.profilePictureSection}>
           {profilePicture ? (
@@ -163,12 +178,11 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ account, setShowProfileModa
           <button onClick={handleSave} className={styles.saveButton}>
             Save
           </button>
-          <button onClick={() => setShowProfileModal(false)} className={styles.cancelButton}>
+          <button onClick={() => dialog.current?.close()} className={styles.cancelButton}>
             Cancel
           </button>
         </div>
-      </div>
-    </div>
+      </dialog>
   );
 };
 
