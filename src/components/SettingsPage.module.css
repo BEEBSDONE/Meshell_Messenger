@@ -38,13 +38,14 @@
   --settings-line: #d8d8d5;
   --settings-muted: #545454;
   --settings-accent: #ffb842;
+  --checkbox-surface: #252525;
   --settings-focus: #985500;
   color-scheme: light;
   width: 100%;
   text-align: center;
 }
 :global(.darkMode) .relaySection {
-  --settings-surface: #252525;
+  --settings-surface: var(--checkbox-surface);
   --settings-line: #444;
   --settings-muted: #bebebe;
   --settings-focus: var(--settings-accent);
@@ -278,7 +279,13 @@
 .preference { padding-block: .8rem; }
 .preference span { font-weight: 600; line-height: 1.35; }
 .preference small { grid-column: 1; }
-.preference input, .inboxList input {
+/* Native unchecked and disabled controls can blend with the surface underneath. */
+.checkboxSurface {
+  display: inline-flex;
+  border-radius: 3px;
+  background: var(--checkbox-surface);
+}
+.checkboxSurface input {
   width: 1.125rem;
   height: 1.125rem;
   margin: 0;

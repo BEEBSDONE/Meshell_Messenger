@@ -18,6 +18,34 @@ function pillStyle(element) {
   };
 }
 
+test('checked and empty Settings checkboxes keep the same colors when switching themes', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, identity(), {}, [], archive);
+  const names = ['Read history from Primal', 'Save encrypted messages for offline use'];
+  async function sampleCheckboxes() {
+    const settings = await openSettings(page);
+    const colors = [];
+    for (const name of names) {
+      const checkbox = settings.getByRole('checkbox', { name, exact: true });
+      await checkbox.scrollIntoViewIfNeeded();
+      const { x, y, width, height } = await checkbox.boundingBox();
+      // The center includes the fill and tick, without the surrounding Settings card.
+      colors.push(await page.screenshot({ clip: {
+        x: Math.floor(x + width / 2) - 5, y: Math.floor(y + height / 2) - 5, width: 10, height: 10,
+      } }));
+    }
+    await settings.getByRole('button', { name: 'Close', exact: true }).tap();
+    return colors;
+  }
+  const light = await sampleCheckboxes();
+  await page.getByRole('button', { name: 'Menu' }).tap();
+  await page.getByRole('checkbox', { name: 'Dark mode' }).check();
+  await page.getByRole('img', { name: 'Meshell Logo' }).tap();
+  const dark = await sampleCheckboxes();
+  expect(light[0].equals(light[1])).toBe(false);
+  for (const [i, name] of names.entries()) expect(light[i].equals(dark[i]), name).toBe(true);
+});
+
 for (const width of [360, 1024]) {
   test(`outside taps dismiss the menu and Profile at ${width}px while inside controls work`, async ({ page }) => {
     await page.setViewportSize({ width, height: 780 });
