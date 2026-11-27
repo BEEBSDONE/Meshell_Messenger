@@ -30,7 +30,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ account, setShowProfileModa
   const dialog = useRef<HTMLDialogElement>(null);
   const backdropPress = useRef(false);
   useLayoutEffect(() => {
-    if (dialog.current && !dialog.current.open) dialog.current.showModal();
+    const modal = dialog.current;
+    if (!modal || modal.open) return;
+    // Prevent showModal() from briefly focusing Username and opening the phone keyboard.
+    modal.inert = true;
+    modal.showModal();
+    modal.inert = false;
+    modal.focus({ preventScroll: true });
   }, []);
 
   useEffect(() => {
