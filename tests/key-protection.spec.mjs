@@ -167,23 +167,25 @@ test('resuming after a suspended timer or a history navigation requires the PIN'
   await expect(locked).toBeVisible();
 });
 
-test('Lock now cancels another tab’s grace even if its change events are delayed', async ({ page, context }) => {
+test('a manual lock in another tab or an undelivered account change cancels a brief switch', async ({ page, context }) => {
   await isolated(page);
   await page.getByRole('button', { name: 'Register' }).click(); await setupPin(page);
   const other = await context.newPage();
   await isolated(other); await unlock(other);
   const settings = await openSettings(other);
-  await page.evaluate(() => {
-    // Model a frozen tab that has not received either cross-tab signal at resume.
-    window.addEventListener('storage', e => e.stopImmediatePropagation(), true);
-  });
-  await other.evaluate(() => { BroadcastChannel.prototype.postMessage = () => {}; });
   await setHidden(page, true);
   await settings.getByRole('button', { name: 'Lock now' }).click();
+  const pin = page.getByRole('heading', { name: 'Unlock MeShell' });
   await expect(other.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
+  await setHidden(page, false);
+  await expect(pin).toBeVisible();
+  await unlock(page);
+  await setHidden(page, true);
+  // Change the marker without delivering a storage event to this document, as on a suspended tab.
+  await page.evaluate(() => localStorage.setItem('meshell:account-change', crypto.randomUUID()));
   expect(new URL(page.url()).pathname).toBe('/chat');
   await setHidden(page, false);
-  await expect(page.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
+  await expect(pin).toBeVisible();
 });
 
 test('competing PIN migrations leave one verified record and preserve the original account', async ({ page, context })=>{
