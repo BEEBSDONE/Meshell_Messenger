@@ -98,6 +98,16 @@ for (const width of [360, 1024]) {
     await page.keyboard.press('Tab');
     await expect(nickname).toBeFocused();
     await expect(nickname).toHaveValue('');
+    // An immediate reopen must not wait for the browser's queued close event.
+    const previousStillMounted = await dialog.getByRole('button', { name: 'Cancel' }).evaluate(async button => {
+      const previous = button.closest('dialog');
+      button.click();
+      await Promise.resolve();
+      return previous.isConnected;
+    });
+    expect(previousStillMounted).toBe(false);
+    await menu.press('Enter'); await profile.press('Enter');
+    await expect(dialog).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await menu.tap(); await page.keyboard.press('Escape');
