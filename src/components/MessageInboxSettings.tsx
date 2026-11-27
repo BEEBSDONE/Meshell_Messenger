@@ -18,8 +18,10 @@ export default function MessageInboxSettings({ inbox, relays, states, giftHistor
       <div className={styles.inboxList}>
         {options.map(url => <label key={url}>
           <span>{url}</span>
-          <input type="checkbox" checked={selection.includes(url)} disabled={inbox.publishing}
-            onChange={e => setSelection(e.target.checked ? [...selection, url] : selection.filter(value => value !== url))} />
+          <span className={styles.checkboxSurface}>
+            <input type="checkbox" checked={selection.includes(url)} disabled={inbox.publishing}
+              onChange={e => setSelection(e.target.checked ? [...selection, url] : selection.filter(value => value !== url))} />
+          </span>
         </label>)}
       </div>
       <div className={styles.inboxActions}>

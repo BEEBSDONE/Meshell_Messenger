@@ -107,7 +107,7 @@ export default function MessageList({ cachedLegacy, rememberLegacy, account, con
           const newDay = !i || date.toDateString() !== new Date(messages[i - 1].time * 1000).toDateString();
           return (
             <Fragment key={message.id}>
-              {newDay && <div className={styles.dateSeparator}>{date.toLocaleDateString(undefined, {
+              {newDay && <div className="historyDate">{date.toLocaleDateString(undefined, {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
               })}</div>}
               <div className={message.sent ? styles.sentMessage : styles.receivedMessage}>

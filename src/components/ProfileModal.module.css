@@ -1,4 +1,5 @@
 .modalContent::backdrop { background: rgb(0 0 0 / 50%); }
+.modalContent:focus { outline: none; }
 
 .modalContent[open] {
   display: flex;

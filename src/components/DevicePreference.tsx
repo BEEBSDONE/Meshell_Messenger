@@ -13,7 +13,9 @@ export default function DevicePreference({ title, description, ...checkbox }: Pr
   const id = useId();
   return <label className={styles.preference}>
     <span id={id}>{title}</span>
-    <input type="checkbox" aria-labelledby={id} aria-describedby={id + '-description'} {...checkbox} />
+    <span className={styles.checkboxSurface}>
+      <input type="checkbox" aria-labelledby={id} aria-describedby={id + '-description'} {...checkbox} />
+    </span>
     <small id={id + '-description'}>{description}</small>
   </label>;
 }

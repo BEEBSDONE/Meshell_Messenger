@@ -1,20 +1,7 @@
 .messageListContainer {
-  --pill-surface: rgb(0 0 0 / 10%);
-  --pill-ink: #4b4b4b;
-  --pill-edge: #c7c7c7;
-  --pill-hover: #dadada;
-  --pill-focus: #915200;
   display: flex;
   flex-direction: column;
   height: 100%;
-}
-
-.messageListContainer.darkMode {
-  --pill-surface: rgb(255 255 255 / 10%);
-  --pill-ink: #dedede;
-  --pill-edge: #525252;
-  --pill-hover: #404040;
-  --pill-focus: #ffb842;
 }
 
 .header {
@@ -152,46 +139,7 @@
   border: 1px solid var(--border-color-dark);
 }
 
-.dateSeparator,
-.messageList :global(.historyControls) button {
-  background: var(--pill-surface);
-  border-radius: 999px;
-  font-family: inherit;
-  text-align: center;
-}
-
-.dateSeparator {
-  margin: 10px 0;
-  padding: 5px 10px;
-  font-size: 0.8em;
-  color: #666;
-  align-self: center;
-  max-width: fit-content;
-}
-
-.darkMode .dateSeparator {
-  color: #b3b3b3;
-}
-
-.messageList :global(.historyControls):empty { display: none; }
 .messageList :global(.historyControls):not(:empty) { gap: .375rem; padding: .25rem 0; }
-.messageList :global(.historyControls) button {
-  min-height: 44px;
-  max-width: 100%;
-  padding: .4rem 1rem;
-  border: 1px solid var(--pill-edge);
-  font-size: .875rem;
-  line-height: 1.3;
-  font-weight: 500;
-  color: var(--pill-ink);
-}
-@media (hover: hover) {
-  .messageList :global(.historyControls) button:hover { background: var(--pill-hover); }
-}
-.messageList :global(.historyControls) button:focus-visible {
-  outline: 2px solid var(--pill-focus);
-  outline-offset: 2px;
-}
 
 .sendNotice { padding: .5rem .75rem; font-size: .875rem; }
 .sendNotice button { margin-left: .5rem; }

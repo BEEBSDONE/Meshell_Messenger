@@ -45,4 +45,25 @@ body {
   text-align: center;
 }
 .historyControls:not(:empty) { padding: 0.6rem; }
-.historyControls button { cursor: pointer; }
+.historyControls:empty { display: none; }
+
+.historyDate, .historyControls button {
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 10%);
+  color: #666;
+  font: .8rem var(--font-family);
+  text-align: center;
+}
+.darkMode :is(.historyDate, .historyControls button) {
+  background: rgb(255 255 255 / 10%);
+  color: #b3b3b3;
+}
+.historyDate { align-self: center; margin: 10px 0; }
+.historyControls button { appearance: none; cursor: pointer; }
+.historyControls button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@media (hover: hover) {
+  .historyControls button:hover { text-decoration: underline; }
+}
