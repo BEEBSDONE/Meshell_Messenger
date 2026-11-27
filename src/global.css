@@ -33,6 +33,8 @@ body {
   color: var(--text-color-dark);
 }
 
+/* Conceal the app while the unlocked document is retained for a brief return. */
+:root[data-meshell-hidden] #root { visibility: hidden; }
 
 .historyControls {
   display: grid;

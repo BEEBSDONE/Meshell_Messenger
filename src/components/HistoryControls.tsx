@@ -1,12 +1,14 @@
 import type useHistory from '../hooks/useHistory';
+import type { ReactNode } from 'react';
 
 interface Props {
   history: ReturnType<typeof useHistory>;
   items: 'messages' | 'conversations';
   empty: boolean;
+  children?: ReactNode;
 }
 
-export default function HistoryControls({ history, items, empty }: Props) {
+export default function HistoryControls({ history, items, empty, children }: Props) {
   const { status, primal, loadOlder } = history;
   const relayPage = status.hasOlder && !status.loading;
   const archivePage = primal.state === 'more';
@@ -19,6 +21,7 @@ export default function HistoryControls({ history, items, empty }: Props) {
 
   return (
     <div className="historyControls">
+      {children}
       {status.loading && <span role="status">Loading {items}…</span>}
       {primal.state === 'loading' && <span role="status">Checking Primal history…</span>}
       {!status.total && archiveOff && <span>No relays configured.</span>}

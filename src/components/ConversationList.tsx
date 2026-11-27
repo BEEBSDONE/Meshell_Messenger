@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import styles from './ConversationList.module.css';
 import ProfilePicture from './ProfilePicture';
 import NewConversationModal from './NewConversationModal';
@@ -46,7 +46,26 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
+  const menu = useRef<HTMLDivElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    function outside(event: MouseEvent) {
+      if (event.target instanceof Node && !menu.current?.contains(event.target)) setIsDropdownOpen(false);
+    }
+    function escape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsDropdownOpen(false);
+        menuButton.current?.focus();
+      }
+    }
+    document.addEventListener('click', outside, true);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('click', outside, true);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [isDropdownOpen]);
 
   const toggleDarkMode = () => {
     const newDarkModeValue = !darkMode;
@@ -57,17 +76,22 @@ const ConversationList: React.FC<ConversationListProps> = ({
   return (
     <div className={styles.conversationList}>
       <div className={styles.header}>
-        <div className={styles.hamburgerMenu}>
-          <button type="button" aria-label="Menu" aria-expanded={isDropdownOpen} className={styles.menuButton} onClick={toggleDropdown}>
+        <div ref={menu} className={styles.hamburgerMenu}>
+          <button ref={menuButton} type="button" aria-label="Menu" aria-expanded={isDropdownOpen} className={styles.menuButton}
+            onClick={() => setIsDropdownOpen(open => !open)}>
             <span className={styles.hamburgerLine}></span>
             <span className={styles.hamburgerLine}></span>
             <span className={styles.hamburgerLine}></span>
           </button>
           {isDropdownOpen && (
             <div className={styles.dropdown}>
-              <div className={styles.dropdownItem} onClick={() => { setShowProfileModal(true); setIsDropdownOpen(false); }}>
+              <button type="button" className={styles.dropdownItem} onClick={() => {
+                menuButton.current?.focus();
+                setShowProfileModal(true);
+                setIsDropdownOpen(false);
+              }}>
                 Profile
-              </div>
+              </button>
               <button type="button" className={styles.dropdownItem} onClick={() => { setShowSettings(true); setIsDropdownOpen(false); }}>
                 Settings
               </button>

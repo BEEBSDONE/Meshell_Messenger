@@ -15,28 +15,34 @@ export default function MessageInboxSettings({ inbox, relays, states, giftHistor
     <h3>Message inbox</h3>
     {selection !== null ? <>
       <p>One to three relays is usually enough for a custom inbox. Your relay list is public.</p>
-      {options.map(url => <label key={url}>
-        <input type="checkbox" checked={selection.includes(url)} disabled={inbox.publishing}
-          onChange={e => setSelection(e.target.checked ? [...selection, url] : selection.filter(value => value !== url))} />
-        {url}
-      </label>)}
-      <button disabled={!inbox.checked || inbox.publishing || !selection.length || selection.length > MAX_INBOX_RELAYS} onClick={publish}>
-        {inbox.publishing ? 'Publishing…' : 'Publish inbox relays'}
-      </button>
-      <button onClick={() => setSelection(null)} disabled={inbox.publishing}>Cancel</button>
+      <div className={styles.inboxList}>
+        {options.map(url => <label key={url}>
+          <span>{url}</span>
+          <input type="checkbox" checked={selection.includes(url)} disabled={inbox.publishing}
+            onChange={e => setSelection(e.target.checked ? [...selection, url] : selection.filter(value => value !== url))} />
+        </label>)}
+      </div>
+      <div className={styles.inboxActions}>
+        <button className={styles.publish} disabled={!inbox.checked || inbox.publishing || !selection.length || selection.length > MAX_INBOX_RELAYS} onClick={publish}>
+          {inbox.publishing ? 'Publishing…' : 'Publish inbox relays'}
+        </button>
+        <button className={styles.secondaryAction} onClick={() => setSelection(null)} disabled={inbox.publishing}>Cancel</button>
+      </div>
     </> : inbox.urls.length ? <>
       <p>Your public inbox lists the relays where people can send you private messages.</p>
-      {inbox.urls.map(url => <p key={url}>{url} {!relays.includes(url) &&
-        <i className={styles.dot} data-state={giftHistory.status.byRelay[url] ?? 'checking'} role="img"
-          aria-label={giftHistory.status.byRelay[url] === 'failed' ? 'Not synced' : giftHistory.status.byRelay[url] === 'synced' ? 'Synced' : 'Checking'} />}</p>)}
-      <button onClick={() => setSelection(inbox.urls)}>Change inbox relays</button>
+      <ul className={styles.inboxList} aria-label="Published inbox relays">
+        {inbox.urls.map(url => <li key={url}><span>{url}</span>{!relays.includes(url) &&
+          <i className={styles.dot} data-state={giftHistory.status.byRelay[url] ?? 'checking'} role="img"
+            aria-label={giftHistory.status.byRelay[url] === 'failed' ? 'Not synced' : giftHistory.status.byRelay[url] === 'synced' ? 'Synced' : 'Checking'} />}</li>)}
+      </ul>
+      <button className={styles.secondaryAction} onClick={() => setSelection(inbox.urls)}>Change inbox relays</button>
     </> : <>
       <p role="status">{inbox.issue || 'Checking your relays. MeShell will publish your synced relays as your public inbox.'}</p>
-      {inbox.issue && !inbox.hasList && relays.length > 0 && <button onClick={inbox.retrySetup}>Retry inbox setup</button>}
-      {inbox.issue && options.length > 0 && <button onClick={() => setSelection(options.filter(url => states[url] === 'synced'))}>Choose inbox relays</button>}
+      {inbox.issue && !inbox.hasList && relays.length > 0 && <button className={styles.secondaryAction} onClick={inbox.retrySetup}>Retry inbox setup</button>}
+      {inbox.issue && options.length > 0 && <button className={styles.secondaryAction} onClick={() => setSelection(options.filter(url => states[url] === 'synced'))}>Choose inbox relays</button>}
     </>}
     {inbox.urls.some(url => !relays.includes(url) && giftHistory.status.byRelay[url] === 'failed') &&
-      <div>Some inbox relays could not sync. <button onClick={giftHistory.retry}>Retry inbox sync</button></div>}
+      <div className={styles.inboxActions}>Some inbox relays could not sync. <button className={styles.secondaryAction} onClick={giftHistory.retry}>Retry inbox sync</button></div>}
     {inbox.error && <small role="alert">{inbox.error}</small>}
   </section>;
 }

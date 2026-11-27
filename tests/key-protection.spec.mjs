@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { decrypt } from 'nostr-tools/nip49';
 import { getPublicKey } from 'nostr-tools/pure';
 import { bech32 } from '@scure/base';
-import { identity, openSettings, setupPin, testPin, typePin, unlock } from './relay.mjs';
+import { identity, newChat, openSettings, setupPin, testPin, typePin, unlock } from './relay.mjs';
 
 async function store(page, op, key, value) {
   return page.evaluate(({ op, key, value }) => new Promise((resolve, reject) => {
@@ -101,7 +101,15 @@ test('an aborted database replacement preserves the old record and permits retry
   expect((await store(page,'get','vault')).pk).toBe(me.pk);
 });
 
-test('a hidden session locks, blocks direct chat access and stops recurring key reads', async ({ page })=>{
+function setHidden(page, hidden) {
+  return page.evaluate(value => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+}
+
+test('a brief switch keeps the draft, ten seconds locks, and key storage is not polled', async ({ page })=>{
+  await page.clock.install();
   await page.addInitScript(()=>{
     window.keyReads=0;
     const get=IDBObjectStore.prototype.get;
@@ -116,17 +124,68 @@ test('a hidden session locks, blocks direct chat access and stops recurring key 
   const count=await page.evaluate(()=>window.keyReads);
   await page.waitForTimeout(2150);
   expect(await page.evaluate(()=>window.keyReads)).toBe(count);
-  await page.evaluate(()=>{
-    Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  await expect(page.getByRole('button',{name:'Menu'})).toHaveCount(0);
-  await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});
+  await newChat(page, identity());
+  const draft = page.getByRole('textbox', { name: 'Message', exact: true });
+  await expect(draft).toBeEditable(); await draft.fill('Keep my draft');
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await setHidden(page, true);
+  await expect(draft).toBeHidden();
+  await page.clock.fastForward(9999);
+  await setHidden(page, false);
+  await expect(draft).toHaveValue('Keep my draft');
+  await page.clock.fastForward(12000);
+  await expect(draft).toBeVisible();
+  await setHidden(page, true);
+  await page.clock.fastForward(6000);
+  await setHidden(page, true); // Duplicate lifecycle events cannot extend the deadline.
+  await page.clock.fastForward(4000);
+  await expect(page).toHaveURL(/\/lock$/);
+  await setHidden(page, false);
   await expect(page.getByRole('heading',{name:'Unlock MeShell'})).toBeVisible();
   await page.goto('/chat'); await expect(page.getByRole('heading',{name:'Unlock MeShell'})).toBeVisible();
   const response = await page.goto('/lock');
   expect(response.status()).toBe(200);
   await expect(page.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
+});
+
+test('resuming after a suspended timer or a history navigation requires the PIN', async ({ page }) => {
+  await page.clock.install();
+  await isolated(page);
+  await page.getByRole('button', { name: 'Register' }).click(); await setupPin(page);
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await setHidden(page, true);
+  await page.clock.setSystemTime(await page.evaluate(() => Date.now() + 10000));
+  expect(new URL(page.url()).pathname).toBe('/chat'); // No background callback has run.
+  await setHidden(page, false);
+  const locked = page.getByRole('heading', { name: 'Unlock MeShell' });
+  await expect(locked).toBeVisible();
+  await page.clock.resume(); await unlock(page);
+  await setHidden(page, true);
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await setHidden(page, false);
+  await expect(locked).toBeVisible();
+});
+
+test('a manual lock in another tab or an undelivered account change cancels a brief switch', async ({ page, context }) => {
+  await isolated(page);
+  await page.getByRole('button', { name: 'Register' }).click(); await setupPin(page);
+  const other = await context.newPage();
+  await isolated(other); await unlock(other);
+  const settings = await openSettings(other);
+  await setHidden(page, true);
+  await settings.getByRole('button', { name: 'Lock now' }).click();
+  const pin = page.getByRole('heading', { name: 'Unlock MeShell' });
+  await expect(other.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
+  await setHidden(page, false);
+  await expect(pin).toBeVisible();
+  await unlock(page);
+  await setHidden(page, true);
+  // Change the marker without delivering a storage event to this document, as on a suspended tab.
+  await page.evaluate(() => localStorage.setItem('meshell:account-change', crypto.randomUUID()));
+  expect(new URL(page.url()).pathname).toBe('/chat');
+  await setHidden(page, false);
+  await expect(pin).toBeVisible();
 });
 
 test('competing PIN migrations leave one verified record and preserve the original account', async ({ page, context })=>{
