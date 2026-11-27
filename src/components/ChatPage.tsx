@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { nsecEncode } from 'nostr-tools/nip19';
 import type { Account } from '../utils/privateMessages';
 import type { Event as NostrEvent } from 'nostr-tools';
@@ -13,7 +13,7 @@ import { verifyEvent } from 'nostr-tools/pure';
 import { MessageCache, initialCacheStatus } from '../utils/messageCache';
 import { conversationPeer } from '../utils/history';
 import { encodeNpub, pool } from '../utils/nostr';
-import { getRelays, getDarkMode, setRelays, primalHistoryEnabled, setPrimalHistoryEnabled } from '../utils/storage';
+import { applyDarkMode, getRelays, getDarkMode, setRelays, primalHistoryEnabled, setPrimalHistoryEnabled } from '../utils/storage';
 import { reconcilePush } from '../utils/push';
 import ConversationList from './ConversationList';
 import MessageList from './MessageList';
@@ -54,7 +54,7 @@ export default function ChatPage({ keys, vaultId, justRegistered }: { keys: Acco
       window.removeEventListener('storage', storage);
     };
   }, [keys]);
-  useEffect(() => { document.body.classList.toggle('darkMode', darkMode); }, [darkMode]);
+  useLayoutEffect(() => { applyDarkMode(darkMode); }, [darkMode]);
 
   const pk = keys.pk;
   const cache = useMemo(() => new MessageCache(keys, vaultId), [keys, vaultId]);

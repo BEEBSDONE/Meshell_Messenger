@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createRumor, createSeal, createWrap } from 'nostr-tools/nip59';
-import { identity, inboxList, login, openSettings, relay } from './relay.mjs';
+import { identity, inboxList, login, openSettings, relay, routeRelays, setupPin, unlock } from './relay.mjs';
 
 test.use({ hasTouch: true });
 const archive = ws => ws.onMessage(raw => {
@@ -17,6 +17,43 @@ function pillStyle(element) {
     text: css.color, background: css.backgroundColor,
   };
 }
+
+test('defaults to dark from login through chat and remembers a light choice after reopening', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await routeRelays(page, {}, archive);
+  await page.addInitScript(() => localStorage.setItem('relays', '[]'));
+  await page.goto('/');
+  const main = page.getByRole('main');
+  const toolbarColor = page.locator('meta[name="theme-color"]');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const toggle = page.getByRole('checkbox', { name: 'Dark mode' });
+  await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible();
+  await expect(main).toHaveCSS('background-color', 'rgb(26, 26, 26)');
+  await expect(toolbarColor).toHaveAttribute('content', '#1a1a1a');
+  expect(await page.evaluate(() => localStorage.getItem('darkMode'))).toBeNull();
+  await page.getByRole('button', { name: 'Register' }).click();
+  await expect(page.getByRole('heading', { name: 'Create your PIN' })).toBeVisible();
+  await expect(main).toHaveCSS('background-color', 'rgb(26, 26, 26)');
+  await setupPin(page);
+  await menu.click();
+  await expect(toggle).toBeChecked();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(26, 26, 26)');
+  await toggle.uncheck();
+  await expect(toolbarColor).toHaveAttribute('content', '#ffffff');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
+  await expect(main).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(toolbarColor).toHaveAttribute('content', '#ffffff');
+  await unlock(page);
+  await menu.click();
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Unlock MeShell' })).toBeVisible();
+  await expect(main).toHaveCSS('background-color', 'rgb(26, 26, 26)');
+  await expect(toolbarColor).toHaveAttribute('content', '#1a1a1a');
+});
 
 test('checked and empty Settings checkboxes keep the same colors when switching themes', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -37,11 +74,11 @@ test('checked and empty Settings checkboxes keep the same colors when switching 
     await settings.getByRole('button', { name: 'Close', exact: true }).tap();
     return colors;
   }
-  const light = await sampleCheckboxes();
-  await page.getByRole('button', { name: 'Menu' }).tap();
-  await page.getByRole('checkbox', { name: 'Dark mode' }).check();
-  await page.getByRole('img', { name: 'Meshell Logo' }).tap();
   const dark = await sampleCheckboxes();
+  await page.getByRole('button', { name: 'Menu' }).tap();
+  await page.getByRole('checkbox', { name: 'Dark mode' }).uncheck();
+  await page.getByRole('img', { name: 'Meshell Logo' }).tap();
+  const light = await sampleCheckboxes();
   expect(light[0].equals(light[1])).toBe(false);
   for (const [i, name] of names.entries()) expect(light[i].equals(dark[i]), name).toBe(true);
 });
@@ -125,9 +162,9 @@ for (const dark of [false, true]) {
     const wrap = createWrap(createSeal(rumor, peer.sk, me.pk), me.pk);
     const server = relay([wrap, inboxList(me, ['sample.test'])]);
     await login(page, me, { 'sample.test': server }, ['sample.test'], archive);
-    if (dark) {
+    if (!dark) {
       await page.getByRole('button', { name: 'Menu' }).tap();
-      await page.getByRole('checkbox', { name: 'Dark mode' }).check();
+      await page.getByRole('checkbox', { name: 'Dark mode' }).uncheck();
       await page.getByRole('img', { name: 'Meshell Logo' }).tap();
     }
     const footer = page.getByRole('region', { name: 'Conversations' }).getByRole('button', { name: 'Load older conversations' });

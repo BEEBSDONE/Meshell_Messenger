@@ -5,7 +5,9 @@ import { registerSW } from 'virtual:pwa-register';
 
 import { startSession } from './utils/session';
 import { flushRevocations } from './utils/push';
+import { applyDarkMode, getDarkMode } from './utils/storage';
 
+applyDarkMode(getDarkMode());
 startSession();
 void flushRevocations();
 window.addEventListener('online', flushRevocations);
